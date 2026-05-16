@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /c/Users/anura/OneDrive/Desktop/noAlone/NoAlone/backend/src/auth/dto)",
+      "Bash(mkdir -p /c/Users/anura/OneDrive/Desktop/noAlone/NoAlone/backend/src/auth/guards)",
+      "Bash(mkdir -p /c/Users/anura/OneDrive/Desktop/noAlone/NoAlone/backend/src/users/dto)",
+      "Bash(mkdir -p /c/Users/anura/OneDrive/Desktop/noAlone/NoAlone/backend/src/chat/dto)",
+      "Bash(mkdir -p /c/Users/anura/OneDrive/Desktop/noAlone/NoAlone/backend/src/matching)",
+      "Bash(railway --version)",
+      "Bash(npx eas:*)",
+      "Bash(docker --version)",
+      "Bash(npm --version)",
+      "Bash(npx eas-cli:*)",
+      "Bash(npx expo:*)",
+      "Bash(railway whoami:*)",
+      "Bash(railway list:*)",
+      "Bash(railway init:*)",
+      "Bash(railway add:*)",
+      "Bash(railway status:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Read(//c/Users/anura/.railway/**)",
+      "Bash(railway service:*)",
+      "Bash(curl:*)",
+      "Bash(node set_railway_vars.mjs)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run:*)",
+      "Bash(railway link:*)",
+      "Bash(railway up:*)",
+      "Bash(eas whoami:*)",
+      "Bash(railway logs:*)",
+      "Bash(node -e \":*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(TOKEN=\"kvXfwB9GngVQNza0rhVTbxY7h-CeV7BCoTWoKnnhCsG\")"
+    ]
+  }
+}

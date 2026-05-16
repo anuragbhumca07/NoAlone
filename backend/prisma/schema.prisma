@@ -1,0 +1,213 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  SYSTEM
+}
+
+enum RoomType {
+  PUBLIC
+  PRIVATE
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
+}
+
+model User {
+  id              String    @id @default(uuid())
+  phone           String?   @unique
+  email           String?   @unique
+  googleId        String?   @unique
+  username        String    @unique
+  displayName     String
+  bio             String?
+  avatarUrl       String?
+  age             Int?
+  gender          Gender?
+  language        String    @default("en")
+  interests       String[]
+  isOnline        Boolean   @default(false)
+  lastSeen        DateTime  @default(now())
+  isVerified      Boolean   @default(false)
+  isBanned        Boolean   @default(false)
+  fcmToken        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  sentMessages      Message[]       @relation("SentMessages")
+  conversations1    Conversation[]  @relation("ConversationUser1")
+  conversations2    Conversation[]  @relation("ConversationUser2")
+  roomMembers       RoomMember[]
+  reportsMade       Report[]        @relation("ReporterUser")
+  reportsReceived   Report[]        @relation("ReportedUser")
+  blockedUsers      Block[]         @relation("BlockerUser")
+  blockedByUsers    Block[]         @relation("BlockedUser")
+  matchRequests     Match[]         @relation("MatchRequester")
+  matchReceived     Match[]         @relation("MatchReceiver")
+
+  @@index([isOnline])
+  @@index([language])
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user1     User      @relation("ConversationUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User      @relation("ConversationUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  conversationId  String?
+  roomId          String?
+  senderId        String
+  content         String?
+  mediaUrl        String?
+  type            MessageType @default(TEXT)
+  isRead          Boolean     @default(false)
+  readAt          DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  room            Room?         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender          User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([roomId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model Room {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  coverUrl    String?
+  type        RoomType  @default(PUBLIC)
+  topic       String?
+  language    String    @default("en")
+  maxMembers  Int       @default(50)
+  isLive      Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  members     RoomMember[]
+  messages    Message[]
+
+  @@index([isLive])
+  @@index([language])
+  @@index([topic])
+}
+
+model RoomMember {
+  id        String   @id @default(uuid())
+  roomId    String
+  userId    String
+  role      String   @default("member") // owner, moderator, member
+  joinedAt  DateTime @default(now())
+  isMuted   Boolean  @default(false)
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model Match {
+  id          String   @id @default(uuid())
+  requesterId String
+  receiverId  String
+  status      String   @default("pending") // pending, accepted, rejected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester   User     @relation("MatchRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("MatchReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([requesterId])
+  @@index([receiverId])
+  @@index([status])
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  reporter    User         @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported    User         @relation("ReportedUser", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([reportedId])
+  @@index([status])
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("BlockerUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
