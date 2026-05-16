@@ -26,6 +26,7 @@ export default api;
 export const authAPI = {
   sendOtp: (phone: string) => api.post('/auth/send-otp', { phone }),
   verifyOtp: (phone: string, code: string) => api.post('/auth/verify-otp', { phone, code }),
+  guestLogin: () => api.post('/auth/guest-login'),
   updateFcmToken: (fcmToken: string) => api.patch('/auth/fcm-token', { fcmToken }),
 };
 

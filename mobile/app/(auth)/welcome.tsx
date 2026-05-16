@@ -1,12 +1,32 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../src/constants';
 import Button from '../../src/components/Button';
 import { Ionicons } from '@expo/vector-icons';
+import { authAPI } from '../../src/services/api';
+import { useAuthStore } from '../../src/store/authStore';
+import { showMessage } from 'react-native-flash-message';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { setToken, setUser } = useAuthStore();
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const handleGuestLogin = async () => {
+    setGuestLoading(true);
+    try {
+      const res = await authAPI.guestLogin();
+      const { token, user } = res.data;
+      setToken(token);
+      setUser(user);
+      router.replace('/(auth)/setup');
+    } catch (e: any) {
+      showMessage({ message: 'Could not connect. Check your internet.', type: 'danger' });
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -38,6 +58,13 @@ export default function WelcomeScreen() {
           <Ionicons name="logo-google" size={20} color="#fff" />
           <Text style={styles.googleText}>Continue with Google</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.guestBtn} onPress={handleGuestLogin} disabled={guestLoading}>
+          {guestLoading ? (
+            <ActivityIndicator color={COLORS.textMuted} size="small" />
+          ) : (
+            <Text style={styles.guestText}>Skip for now — Try as Guest</Text>
+          )}
+        </TouchableOpacity>
         <Text style={styles.terms}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </Text>
@@ -67,5 +94,7 @@ const styles = StyleSheet.create({
     gap: 10, borderWidth: 1.5, borderColor: COLORS.border,
   },
   googleText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
-  terms: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  guestBtn: { height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  guestText: { color: COLORS.textMuted, fontSize: 14, textDecorationLine: 'underline' },
+  terms: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 18 },
 });

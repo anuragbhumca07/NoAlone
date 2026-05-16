@@ -105,6 +105,18 @@ export class AuthService {
     return { token, user, isNew };
   }
 
+  async guestLogin(): Promise<{ token: string; user: any; isNew: boolean }> {
+    const username = this.generateUsername();
+    const user = await this.prisma.user.create({
+      data: {
+        username,
+        displayName: username,
+      },
+    });
+    const token = this.jwtService.sign({ sub: user.id, username: user.username });
+    return { token, user, isNew: true };
+  }
+
   async updateFcmToken(userId: string, fcmToken: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },

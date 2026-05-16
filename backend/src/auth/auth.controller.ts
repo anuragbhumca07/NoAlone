@@ -41,6 +41,12 @@ export class AuthController {
     });
   }
 
+  @Post('guest-login')
+  @ApiOperation({ summary: 'Skip phone verification — login as guest' })
+  guestLogin() {
+    return this.authService.guestLogin();
+  }
+
   @Patch('fcm-token')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
