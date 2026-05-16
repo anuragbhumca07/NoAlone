@@ -53,7 +53,7 @@ export class ChatService {
     }));
   }
 
-  async getMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
+  async getMessages(conversationId: string, userId: string, cursor?: string, limit: number | string = 30) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
     });
@@ -72,7 +72,7 @@ export class ChatService {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: Number(limit),
     });
 
     return messages.reverse();
