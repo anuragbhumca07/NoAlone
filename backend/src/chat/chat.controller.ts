@@ -29,8 +29,9 @@ export class ChatController {
     @Req() req: any,
     @Param('id') id: string,
     @Query('cursor') cursor?: string,
-    @Query('limit') limit?: number,
+    @Query('limit') limitStr?: string,
   ) {
+    const limit = limitStr ? parseInt(limitStr, 10) : 30;
     return this.chatService.getMessages(id, req.user.id, cursor, limit);
   }
 

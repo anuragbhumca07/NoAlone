@@ -75,7 +75,7 @@ export class RoomsService {
     return { success: true };
   }
 
-  async getMessages(roomId: string, cursor?: string, limit: number | string = 50) {
+  async getMessages(roomId: string, cursor?: string, limit: number = 50) {
     return this.prisma.message.findMany({
       where: {
         roomId,
@@ -86,7 +86,7 @@ export class RoomsService {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: Number(limit),
+      take: limit,
     });
   }
 

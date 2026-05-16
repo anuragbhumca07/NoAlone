@@ -63,7 +63,8 @@ export class RoomsController {
 
   @Get(':id/messages')
   @ApiOperation({ summary: 'Get room messages' })
-  getMessages(@Param('id') id: string, @Query('cursor') cursor?: string, @Query('limit') limit?: number) {
+  getMessages(@Param('id') id: string, @Query('cursor') cursor?: string, @Query('limit') limitStr?: string) {
+    const limit = limitStr ? parseInt(limitStr, 10) : 50;
     return this.roomsService.getMessages(id, cursor, limit);
   }
 
