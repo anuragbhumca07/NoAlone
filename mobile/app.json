@@ -41,21 +41,21 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "react-native-webview",
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
           "color": "#7c3aed"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "noalone",
+    "newArchEnabled": true,
     "extra": {
       "eas": {
         "projectId": "10da4c07-393f-49ae-9569-cb174761be35"
-      },
-      "router": {
-        "origin": false
       }
     },
     "owner": "anuragbhumca07"

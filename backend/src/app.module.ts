@@ -11,6 +11,7 @@ import { MatchingModule } from './matching/matching.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { CallsModule } from './calls/calls.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ModerationModule } from './moderation/moderation.module';
     RoomsModule,
     NotificationsModule,
     ModerationModule,
+    CallsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

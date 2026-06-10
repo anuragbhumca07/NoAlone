@@ -71,6 +71,19 @@ export const matchingAPI = {
   getHistory: () => api.get('/matching/history'),
 };
 
+// Calls
+export const callsAPI = {
+  getAuthorizeStatus: () => api.get('/calls/authorize-status'),
+  authorize: (code: string, redirectUri: string) => api.post('/calls/authorize', { code, redirectUri }),
+  initiate: (receiverId: string, callType: 'VOICE' | 'VIDEO') =>
+    api.post('/calls/initiate', { receiverId, callType }),
+  accept: (callId: string) => api.post(`/calls/${callId}/accept`),
+  decline: (callId: string) => api.post(`/calls/${callId}/decline`),
+  cancel: (callId: string) => api.post(`/calls/${callId}/cancel`),
+  end: (callId: string) => api.post(`/calls/${callId}/end`),
+  getHistory: (page = 1, limit = 20) => api.get(`/calls/history?page=${page}&limit=${limit}`),
+};
+
 // Moderation
 export const moderationAPI = {
   reportUser: (data: any) => api.post('/moderation/report', data),

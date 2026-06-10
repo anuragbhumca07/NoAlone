@@ -44,6 +44,19 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum CallStatus {
+  RINGING
+  ACCEPTED
+  DECLINED
+  MISSED
+  ENDED
+}
+
+enum CallType {
+  VOICE
+  VIDEO
+}
+
 model User {
   id              String    @id @default(uuid())
   phone           String?   @unique
@@ -61,6 +74,11 @@ model User {
   emailVerified             Boolean   @default(false)
   emailVerificationCode     String?
   emailVerificationExpiry   DateTime?
+  // Google Calendar / Meet OAuth tokens (encrypted at rest)
+  googleAccessToken         String?
+  googleRefreshToken        String?
+  googleTokenExpiry         DateTime?
+  isGoogleAuthorized        Boolean   @default(false)
   isOnline        Boolean   @default(false)
   lastSeen        DateTime  @default(now())
   isVerified      Boolean   @default(false)
@@ -80,6 +98,8 @@ model User {
   blockedByUsers    Block[]         @relation("BlockedUser")
   matchRequests     Match[]         @relation("MatchRequester")
   matchReceived     Match[]         @relation("MatchReceiver")
+  callsMade         Call[]          @relation("CallerCalls")
+  callsReceived     Call[]          @relation("ReceiverCalls")
 
   @@index([isOnline])
   @@index([language])
@@ -203,6 +223,28 @@ model Block {
   blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
+}
+
+model Call {
+  id          String     @id @default(uuid())
+  callerId    String
+  receiverId  String
+  meetLink    String?
+  meetCode    String?
+  status      CallStatus @default(RINGING)
+  callType    CallType   @default(VOICE)
+  createdAt   DateTime   @default(now())
+  answeredAt  DateTime?
+  endedAt     DateTime?
+  expiresAt   DateTime?
+
+  caller      User       @relation("CallerCalls", fields: [callerId], references: [id], onDelete: Cascade)
+  receiver    User       @relation("ReceiverCalls", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([callerId])
+  @@index([receiverId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OtpCode {
