@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { COLORS } from '../../src/constants';
 import Button from '../../src/components/Button';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,24 +12,51 @@ import { authAPI } from '../../src/services/api';
 import { useAuthStore } from '../../src/store/authStore';
 import { showMessage } from 'react-native-flash-message';
 
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID =
+  '513754739235-fb3scfuq6m8o4cd4ssjg2ta40d609ho1.apps.googleusercontent.com';
+
 export default function WelcomeScreen() {
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
-  const [guestLoading, setGuestLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleGuestLogin = async () => {
-    setGuestLoading(true);
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const accessToken = response.authentication?.accessToken;
+      if (accessToken) {
+        handleGoogleLogin(accessToken);
+      }
+    } else if (response?.type === 'error') {
+      showMessage({ message: 'Google sign-in failed. Try again.', type: 'danger' });
+    }
+  }, [response]);
+
+  const handleGoogleLogin = async (accessToken: string) => {
+    setGoogleLoading(true);
     try {
-      const res = await authAPI.guestLogin();
-      const { token, user } = res.data;
+      const res = await authAPI.googleMobileLogin(accessToken);
+      const { token, user, isNew } = res.data;
       setToken(token);
       setUser(user);
-      router.replace('/(auth)/setup');
+      router.replace(isNew ? '/(auth)/setup' : '/(tabs)');
     } catch (e: any) {
-      showMessage({ message: 'Could not connect. Check your internet.', type: 'danger' });
+      const msg = e?.response?.data?.message || 'Google sign-in failed. Try again.';
+      showMessage({ message: msg, type: 'danger' });
     } finally {
-      setGuestLoading(false);
+      setGoogleLoading(false);
     }
+  };
+
+  const handleGooglePress = async () => {
+    if (!request) return;
+    await promptAsync({ useProxy: true });
   };
 
   return (
@@ -52,19 +83,50 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={styles.actions}>
-        <Button title="Get Started with Phone" onPress={() => router.push('/(auth)/phone')} />
-        <Text style={styles.orText}>— or —</Text>
-        <TouchableOpacity style={styles.googleBtn} onPress={() => {}}>
-          <Ionicons name="logo-google" size={20} color="#fff" />
-          <Text style={styles.googleText}>Continue with Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.guestBtn} onPress={handleGuestLogin} disabled={guestLoading}>
-          {guestLoading ? (
-            <ActivityIndicator color={COLORS.textMuted} size="small" />
+        {/* Google Sign-In */}
+        <TouchableOpacity
+          style={[styles.googleBtn, (!request || googleLoading) && styles.btnDisabled]}
+          onPress={handleGooglePress}
+          disabled={!request || googleLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.guestText}>Skip for now — Try as Guest</Text>
+            <>
+              <Ionicons name="logo-google" size={20} color="#fff" />
+              <Text style={styles.googleText}>Continue with Google</Text>
+            </>
           )}
         </TouchableOpacity>
+
+        <Text style={styles.orText}>— or —</Text>
+
+        {/* Phone OTP */}
+        <Button
+          title="Continue with Phone"
+          onPress={() => router.push('/(auth)/phone')}
+          style={styles.phoneBtn}
+        />
+
+        {/* Email Sign-Up / Login */}
+        <TouchableOpacity
+          style={styles.emailBtn}
+          onPress={() => router.push('/(auth)/email-signup')}
+        >
+          <Ionicons name="mail-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.emailBtnText}>Sign up with Email</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.loginLink}
+          onPress={() => router.push('/(auth)/email-login')}
+        >
+          <Text style={styles.loginLinkText}>
+            Already have an account?{' '}
+            <Text style={styles.loginLinkBold}>Log in</Text>
+          </Text>
+        </TouchableOpacity>
+
         <Text style={styles.terms}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </Text>
@@ -84,17 +146,29 @@ const styles = StyleSheet.create({
   logoEmoji: { fontSize: 48 },
   appName: { fontSize: 40, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
   tagline: { fontSize: 18, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 28 },
-  features: { gap: 16, marginBottom: 40 },
-  feature: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.surface, padding: 16, borderRadius: 14 },
-  featureText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
-  actions: { paddingBottom: 48, gap: 8 },
-  orText: { textAlign: 'center', color: COLORS.textMuted, fontSize: 14, marginVertical: 8 },
-  googleBtn: {
-    height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, borderWidth: 1.5, borderColor: COLORS.border,
+  features: { gap: 12, marginBottom: 32 },
+  feature: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: COLORS.surface, padding: 14, borderRadius: 14,
   },
-  googleText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
-  guestBtn: { height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  guestText: { color: COLORS.textMuted, fontSize: 14, textDecorationLine: 'underline' },
-  terms: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 18 },
+  featureText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  actions: { paddingBottom: 48, gap: 10 },
+  googleBtn: {
+    height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10, backgroundColor: '#4285F4',
+  },
+  btnDisabled: { opacity: 0.6 },
+  googleText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  orText: { textAlign: 'center', color: COLORS.textMuted, fontSize: 14, marginVertical: 2 },
+  phoneBtn: { marginTop: 0 },
+  emailBtn: {
+    height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15`,
+  },
+  emailBtnText: { color: COLORS.primary, fontSize: 15, fontWeight: '600' },
+  loginLink: { alignItems: 'center', paddingVertical: 4 },
+  loginLinkText: { color: COLORS.textMuted, fontSize: 14 },
+  loginLinkBold: { color: COLORS.primary, fontWeight: '700' },
+  terms: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4 },
 });

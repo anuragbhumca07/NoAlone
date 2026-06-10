@@ -26,7 +26,10 @@ export default api;
 export const authAPI = {
   sendOtp: (phone: string) => api.post('/auth/send-otp', { phone }),
   verifyOtp: (phone: string, code: string) => api.post('/auth/verify-otp', { phone, code }),
-  guestLogin: () => api.post('/auth/guest-login'),
+  googleMobileLogin: (accessToken: string) => api.post('/auth/google-mobile', { accessToken }),
+  emailRegister: (email: string, password: string) => api.post('/auth/email/register', { email, password }),
+  emailVerify: (email: string, code: string) => api.post('/auth/email/verify', { email, code }),
+  emailLogin: (email: string, password: string) => api.post('/auth/email/login', { email, password }),
   updateFcmToken: (fcmToken: string) => api.patch('/auth/fcm-token', { fcmToken }),
 };
 

@@ -57,6 +57,10 @@ model User {
   gender          Gender?
   language        String    @default("en")
   interests       String[]
+  passwordHash              String?
+  emailVerified             Boolean   @default(false)
+  emailVerificationCode     String?
+  emailVerificationExpiry   DateTime?
   isOnline        Boolean   @default(false)
   lastSeen        DateTime  @default(now())
   isVerified      Boolean   @default(false)
