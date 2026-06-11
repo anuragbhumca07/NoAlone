@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, Res, Patch } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Res, Patch, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { AuthService } from './auth.service';
@@ -57,6 +57,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email + password' })
   emailLogin(@Body() dto: EmailLoginDto) {
     return this.authService.loginWithEmail(dto);
+  }
+
+  // ─── Test Helper (only active when TEST_API_KEY env var is set) ─────────────
+
+  @Post('test/verification-code')
+  @ApiOperation({ summary: 'Get stored verification code for a user (test-only)' })
+  async testGetVerificationCode(@Body() body: { email: string; testKey: string }) {
+    const testKey = process.env.TEST_API_KEY;
+    if (!testKey || body.testKey !== testKey) throw new ForbiddenException();
+    return this.authService.devGetVerificationCode(body.email);
   }
 
   // ─── Web OAuth (not used by mobile) ──────────────────────────────────────────

@@ -203,6 +203,16 @@ export class AuthService {
     return { token, user, isNew: false };
   }
 
+  // ─── Test Helper ─────────────────────────────────────────────────────────────
+
+  async devGetVerificationCode(email: string): Promise<{ code: string | null }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { emailVerificationCode: true },
+    });
+    return { code: user?.emailVerificationCode ?? null };
+  }
+
   // ─── FCM ─────────────────────────────────────────────────────────────────────
 
   async updateFcmToken(userId: string, fcmToken: string): Promise<void> {
