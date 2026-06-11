@@ -3,9 +3,10 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
+  workers: 1,
   retries: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1',
+    baseURL: process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1/',
   },
 });

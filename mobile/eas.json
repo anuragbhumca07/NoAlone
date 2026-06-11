@@ -6,9 +6,18 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://noalone-api-production.up.railway.app/api/v1",
+        "EXPO_PUBLIC_WS_URL": "https://noalone-api-production.up.railway.app"
+      }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://noalone-api-production.up.railway.app/api/v1",
+        "EXPO_PUBLIC_WS_URL": "https://noalone-api-production.up.railway.app"
+      }
+    }
   },
   "submit": {
     "production": {}
