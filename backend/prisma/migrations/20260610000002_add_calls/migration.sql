@@ -1,18 +1,37 @@
--- CreateEnum
-CREATE TYPE "CallStatus" AS ENUM ('RINGING', 'ACCEPTED', 'DECLINED', 'MISSED', 'ENDED');
+-- CreateEnum (idempotent)
+DO $$ BEGIN
+  CREATE TYPE "CallStatus" AS ENUM ('RINGING', 'ACCEPTED', 'DECLINED', 'MISSED', 'ENDED');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- CreateEnum
-CREATE TYPE "CallType" AS ENUM ('VOICE', 'VIDEO');
+DO $$ BEGIN
+  CREATE TYPE "CallType" AS ENUM ('VOICE', 'VIDEO');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- AlterTable: add Google Calendar OAuth fields to User
-ALTER TABLE "User"
-  ADD COLUMN "googleAccessToken"  TEXT,
-  ADD COLUMN "googleRefreshToken" TEXT,
-  ADD COLUMN "googleTokenExpiry"  TIMESTAMP(3),
-  ADD COLUMN "isGoogleAuthorized" BOOLEAN NOT NULL DEFAULT false;
+-- AlterTable: add Google Calendar OAuth fields to User (idempotent)
+DO $$ BEGIN
+  ALTER TABLE "User" ADD COLUMN "googleAccessToken"  TEXT;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
 
--- CreateTable: Call
-CREATE TABLE "Call" (
+DO $$ BEGIN
+  ALTER TABLE "User" ADD COLUMN "googleRefreshToken" TEXT;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "User" ADD COLUMN "googleTokenExpiry"  TIMESTAMP(3);
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "User" ADD COLUMN "isGoogleAuthorized" BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- CreateTable: Call (idempotent)
+CREATE TABLE IF NOT EXISTS "Call" (
   "id"         TEXT NOT NULL,
   "callerId"   TEXT NOT NULL,
   "receiverId" TEXT NOT NULL,
@@ -27,15 +46,21 @@ CREATE TABLE "Call" (
   CONSTRAINT "Call_pkey" PRIMARY KEY ("id")
 );
 
--- AddForeignKey
-ALTER TABLE "Call" ADD CONSTRAINT "Call_callerId_fkey"
-  FOREIGN KEY ("callerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent)
+DO $$ BEGIN
+  ALTER TABLE "Call" ADD CONSTRAINT "Call_callerId_fkey"
+    FOREIGN KEY ("callerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-ALTER TABLE "Call" ADD CONSTRAINT "Call_receiverId_fkey"
-  FOREIGN KEY ("receiverId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Call" ADD CONSTRAINT "Call_receiverId_fkey"
+    FOREIGN KEY ("receiverId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- CreateIndex
-CREATE INDEX "Call_callerId_idx"   ON "Call"("callerId");
-CREATE INDEX "Call_receiverId_idx" ON "Call"("receiverId");
-CREATE INDEX "Call_status_idx"     ON "Call"("status");
-CREATE INDEX "Call_createdAt_idx"  ON "Call"("createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "Call_callerId_idx"   ON "Call"("callerId");
+CREATE INDEX IF NOT EXISTS "Call_receiverId_idx" ON "Call"("receiverId");
+CREATE INDEX IF NOT EXISTS "Call_status_idx"     ON "Call"("status");
+CREATE INDEX IF NOT EXISTS "Call_createdAt_idx"  ON "Call"("createdAt");
