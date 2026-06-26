@@ -5,3 +5,7 @@ dist/
 .expo/
 .DS_Store
 *.orig
+.playwright-mcp/
+test-results/
+playwright-report/
+swagger-ui.png
