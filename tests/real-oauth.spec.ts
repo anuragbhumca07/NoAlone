@@ -56,7 +56,9 @@ test('Authorize Google CTA redirects to accounts.google.com with our client ID',
   expect(url).toContain('accounts.google.com/o/oauth2/v2/auth');
   expect(url).toContain(`client_id=${EXPECTED_CLIENT_ID}`);
   expect(url).toContain('scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events');
-  expect(url).toContain('redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Foauth%2Fgoogle');
+  // Redirect URI matches whatever origin the test is running against
+  const expectedRedirect = encodeURIComponent(`${WEB_URL.replace(/\/$/, '')}/oauth/google`);
+  expect(url).toContain(`redirect_uri=${expectedRedirect}`);
   expect(url).toContain('state=calls');
   expect(url).toContain('response_type=code');
 });

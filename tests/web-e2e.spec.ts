@@ -25,6 +25,23 @@ const TS = Date.now();
 const USER_A_EMAIL = `web-a.${TS}@testmail.noalone`;
 const USER_B_EMAIL = `web-b.${TS}@testmail.noalone`;
 
+// Mock-mode tests synthesize a fake incoming-call event in the browser to
+// exercise the ringing modal without hitting Google. They only make sense
+// when the deployed bundle has VITE_MOCK_CALLS=true. Detect by checking the
+// served bundle once at suite startup.
+let mockMode = false;
+async function detectMockMode(baseURL: string) {
+  try {
+    const res = await fetch(baseURL);
+    const html = await res.text();
+    const m = html.match(/assets\/([^"']+\.js)/);
+    if (!m) return false;
+    const jsRes = await fetch(`${baseURL.replace(/\/$/, '')}/${m[1]}`);
+    const js = await jsRes.text();
+    return /VITE_MOCK_CALLS["'\s:=]+true|"true"\s*===\s*"true"/.test(js) || js.includes('mock-incoming-call');
+  } catch { return false; }
+}
+
 // Each test below is independent except where it references shared state from
 // the previous step. Serial mode keeps the journey coherent.
 test.describe.configure({ mode: 'serial' });
@@ -68,6 +85,10 @@ async function registerVerifyLogin(page: Page, email: string) {
 
 // ── seed both users via API so chat search/conversation works ─────────────────
 test.beforeAll(async ({ playwright }) => {
+  const webURL = process.env.WEB_URL || 'http://127.0.0.1:5173';
+  mockMode = await detectMockMode(webURL);
+  console.log(`Detected mock mode: ${mockMode} (web=${webURL})`);
+
   const baseURL = BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`;
   const ctx = await playwright.request.newContext({ baseURL });
 
@@ -272,6 +293,7 @@ test('send a message — optimistic bubble appears in thread', async ({ page }) 
 
 test('initiate mock voice call surfaces the incoming-call modal', async ({ page, context }) => {
   test.skip(!state.conversationId, 'No conversation yet');
+  test.skip(!mockMode, 'Bundle is in real-Google mode — calling-modal flow is exercised manually');
 
   await page.goto('/login');
   await page.getByTestId('login-email').fill(USER_A_EMAIL);
@@ -315,6 +337,7 @@ test('initiate mock voice call surfaces the incoming-call modal', async ({ page,
 
 test('accept mock incoming call opens a meet.google.com link', async ({ page }) => {
   test.skip(!state.conversationId, 'No conversation yet');
+  test.skip(!mockMode, 'Bundle is in real-Google mode — Meet link generation is exercised manually after consent');
 
   await page.goto('/login');
   await page.getByTestId('login-email').fill(USER_A_EMAIL);
@@ -351,6 +374,7 @@ test('accept mock incoming call opens a meet.google.com link', async ({ page }) 
 
 test('decline mock incoming call closes the modal', async ({ page }) => {
   test.skip(!state.conversationId, 'No conversation yet');
+  test.skip(!mockMode, 'Bundle is in real-Google mode — decline flow is exercised manually');
 
   await page.goto('/login');
   await page.getByTestId('login-email').fill(USER_A_EMAIL);

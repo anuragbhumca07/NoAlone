@@ -40,6 +40,11 @@ export default defineConfig({
       testMatch: ['backend-google-config.spec.ts'],
       use: { baseURL: BACKEND_URL },
     },
+    {
+      name: 'recover',
+      testMatch: ['recover-code.spec.ts'],
+      use: { baseURL: BACKEND_URL },
+    },
   ],
 
   webServer: process.env.SKIP_WEB_SERVER
