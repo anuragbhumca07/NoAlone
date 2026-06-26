@@ -1,15 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
+/**
+ * Resend's `onboarding@resend.dev` sender (used here) only delivers reliably
+ * to the email address that owns the Resend account — unverified recipients
+ * get silently dropped. For production, verify a custom domain in Resend and
+ * update RESEND_FROM accordingly. For development, sendVerificationEmail()
+ * always logs the code at INFO so it is recoverable from Railway logs even
+ * when delivery fails.
+ */
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendVerificationEmail(email: string, code: string): Promise<void> {
+    // Always log first so the code is recoverable if delivery silently fails.
+    this.logger.log(`[VERIFICATION CODE] email=${email} code=${code}`);
+
+    if (!process.env.RESEND_API_KEY) {
+      this.logger.warn('RESEND_API_KEY not set — skipping email send');
+      return;
+    }
+
     try {
-      await this.resend.emails.send({
-        from: 'noAlone <onboarding@resend.dev>',
+      const result = await this.resend.emails.send({
+        from: process.env.RESEND_FROM || 'noAlone <onboarding@resend.dev>',
         to: email,
         subject: 'Your noAlone verification code',
         html: `
@@ -42,9 +58,21 @@ export class EmailService {
           </html>
         `,
       });
+      if ((result as any)?.error) {
+        // Resend may return 200 with an error payload (e.g. unverified recipient)
+        this.logger.warn(
+          `Resend returned error for ${email}: ${JSON.stringify((result as any).error)} — code stays in logs`,
+        );
+        return;
+      }
+      this.logger.log(`Verification email sent to ${email} (id=${(result as any)?.data?.id || 'n/a'})`);
     } catch (err) {
-      this.logger.error('Failed to send verification email', err);
-      throw err;
+      // Non-fatal: registration must still succeed; user can recover the code
+      // via the test-code endpoint or Railway logs.
+      this.logger.error(
+        `Failed to send verification email to ${email} — code still valid; recover via logs or POST /auth/email/recover-code`,
+        err as any,
+      );
     }
   }
 }

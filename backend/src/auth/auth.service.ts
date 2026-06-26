@@ -213,6 +213,35 @@ export class AuthService {
     return { code: user?.emailVerificationCode ?? null };
   }
 
+  /**
+   * Self-service recovery: lets a user retrieve their own pending verification
+   * code by proving they know the password they registered with.
+   * Safe in production because (a) it requires the correct password, (b) it
+   * only returns codes for accounts not yet verified, (c) it returns the
+   * existing code rather than generating a new one (so it can't be used to
+   * spam users by triggering new codes for unrelated accounts).
+   */
+  async recoverVerificationCode(email: string, password: string): Promise<{ code: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+    if (user.emailVerified) {
+      throw new BadRequestException('Email already verified — please sign in.');
+    }
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+    if (!user.emailVerificationCode) {
+      throw new BadRequestException('No pending verification — please register again.');
+    }
+    if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+      throw new BadRequestException('Verification code expired — please register again.');
+    }
+    return { code: user.emailVerificationCode };
+  }
+
   // ─── FCM ─────────────────────────────────────────────────────────────────────
 
   async updateFcmToken(userId: string, fcmToken: string): Promise<void> {

@@ -59,6 +59,15 @@ export class AuthController {
     return this.authService.loginWithEmail(dto);
   }
 
+  @Post('email/recover-code')
+  @ApiOperation({
+    summary:
+      'Retrieve own pending verification code (requires password). Use this if the verification email never arrived.',
+  })
+  emailRecoverCode(@Body() dto: EmailLoginDto) {
+    return this.authService.recoverVerificationCode(dto.email, dto.password);
+  }
+
   // ─── Test Helper (only active when TEST_API_KEY env var is set) ─────────────
 
   @Post('test/verification-code')
