@@ -46,10 +46,16 @@ export default function Conversation() {
     if (!token || !id) return;
     const socket = getSocket(token);
     if (!socket) return;
-    const onNew = (msg: Message) => {
-      if (msg.conversationId === id) {
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-      }
+    const onNew = (msg: Message & { tempId?: string }) => {
+      if (msg.conversationId !== id) return;
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        // Reconcile with our own optimistic bubble instead of duplicating it.
+        if (msg.tempId && prev.some((m) => m.id === msg.tempId)) {
+          return prev.map((m) => (m.id === msg.tempId ? msg : m));
+        }
+        return [...prev, msg];
+      });
     };
     socket.on('message:new', onNew);
     return () => { socket.off('message:new', onNew); };
@@ -64,9 +70,10 @@ export default function Conversation() {
     if (!text.trim() || !id) return;
     const content = text.trim();
     setText('');
+    const tempId = `local-${Date.now()}`;
     // Optimistic add — render immediately regardless of socket state
     setMessages((prev) => [...prev, {
-      id: `local-${Date.now()}`,
+      id: tempId,
       conversationId: id,
       senderId: user?.id || '',
       content,
@@ -81,6 +88,7 @@ export default function Conversation() {
         targetUserId: otherUser.id,
         content,
         type: 'TEXT',
+        tempId,
       });
     }
   };

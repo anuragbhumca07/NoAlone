@@ -13,9 +13,11 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
-  // CORS
+  // CORS — FRONTEND_URL may be a comma-separated list (e.g. localhost and
+  // 127.0.0.1 are different origins to the browser even on the same machine).
+  const frontendUrls = process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: frontendUrls?.length ? frontendUrls : '*',
     credentials: true,
   });
 

@@ -14,17 +14,17 @@ const EXPECTED_CLIENT_ID = '513754739235-gfq00i29g37enqjml1u9nf860l4hknni.apps.g
 const PASSWORD = 'OAuthCheck@2026!';
 
 test('Authorize Google CTA redirects to accounts.google.com with our client ID', async ({ page }) => {
-  // Seed and verify a quick throwaway user via the API
+  // Seed a pre-confirmed Supabase user via the API — the web login UI is
+  // Supabase-only now, so a plain backend-only user can't sign in through it.
   const ts = Date.now();
   const email = `oauth-probe.${ts}@testmail.noalone`;
 
   const ctx = await request.newContext({ baseURL: `${BACKEND_URL}/` });
-  await ctx.post('auth/email/register', { data: { email, password: PASSWORD } });
-  const codeRes = await ctx.post('auth/test/verification-code', {
-    data: { email, testKey: TEST_API_KEY },
+  const seedRes = await ctx.post('auth/test/supabase-seed-user', {
+    data: { email, password: PASSWORD, testKey: TEST_API_KEY },
   });
-  const { code } = await codeRes.json();
-  await ctx.post('auth/email/verify', { data: { email, code } });
+  const { accessToken } = await seedRes.json();
+  await ctx.post('auth/supabase-sync', { data: { accessToken } });
   await ctx.dispose();
 
   // Log in through the UI

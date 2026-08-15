@@ -15,7 +15,7 @@
  * one-time consent that cannot be automated.
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const BACKEND_URL =
   process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1';
@@ -36,7 +36,7 @@ async function detectMockMode(baseURL: string) {
     const html = await res.text();
     const m = html.match(/assets\/([^"']+\.js)/);
     if (!m) return false;
-    const jsRes = await fetch(`${baseURL.replace(/\/$/, '')}/${m[1]}`);
+    const jsRes = await fetch(`${baseURL.replace(/\/$/, '')}/${m[0]}`);
     const js = await jsRes.text();
     return /VITE_MOCK_CALLS["'\s:=]+true|"true"\s*===\s*"true"/.test(js) || js.includes('mock-incoming-call');
   } catch { return false; }
@@ -56,31 +56,24 @@ const state: {
   conversationId?: string;
 } = {};
 
-async function getVerificationCode(page: Page, email: string): Promise<string> {
-  const res = await page.request.post(`${BACKEND_URL}/auth/test/verification-code`, {
-    data: { email, testKey: TEST_API_KEY },
+// Seeds a pre-confirmed Supabase user (via the backend test-helper, which
+// uses the Supabase service role key) and syncs it into the noAlone backend,
+// exactly like the real Login page's Supabase flow does.
+async function seedSupabaseUser(
+  ctx: import('@playwright/test').APIRequestContext,
+  email: string,
+): Promise<{ id: string; username: string; displayName: string }> {
+  const seedRes = await ctx.post('auth/test/supabase-seed-user', {
+    data: { email, password: PASSWORD, testKey: TEST_API_KEY },
   });
-  expect(res.ok(), `test-helper failed for ${email}`).toBeTruthy();
-  const body = await res.json();
-  expect(body.code, `no code for ${email}`).toBeTruthy();
-  return body.code as string;
-}
+  expect(seedRes.ok(), `supabase seed failed for ${email}`).toBeTruthy();
+  const { accessToken } = await seedRes.json();
+  expect(accessToken, `no access token for ${email}`).toBeTruthy();
 
-async function registerVerifyLogin(page: Page, email: string) {
-  // Register
-  await page.goto('/register');
-  await expect(page.getByTestId('register-card')).toBeVisible();
-  await page.getByTestId('register-email').fill(email);
-  await page.getByTestId('register-password').fill(PASSWORD);
-  await page.getByTestId('register-submit').click();
-  await expect(page.getByTestId('verify-card')).toBeVisible({ timeout: 15_000 });
-
-  // Verify (fetch code via backend test helper)
-  const code = await getVerificationCode(page, email);
-  await page.getByTestId('verify-code').fill(code);
-  await page.getByTestId('verify-submit').click();
-  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
-  await expect(page.getByTestId('chats-page')).toBeVisible();
+  const syncRes = await ctx.post('auth/supabase-sync', { data: { accessToken } });
+  expect(syncRes.ok(), `supabase-sync failed for ${email}`).toBeTruthy();
+  const body = await syncRes.json();
+  return body.user;
 }
 
 // ── seed both users via API so chat search/conversation works ─────────────────
@@ -92,40 +85,29 @@ test.beforeAll(async ({ playwright }) => {
   const baseURL = BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`;
   const ctx = await playwright.request.newContext({ baseURL });
 
-  for (const email of [USER_A_EMAIL, USER_B_EMAIL]) {
-    const reg = await ctx.post('auth/email/register', {
-      data: { email, password: PASSWORD },
-    });
-    expect([200, 201]).toContain(reg.status());
+  const userA = await seedSupabaseUser(ctx, USER_A_EMAIL);
+  state.userAId = userA.id;
+  state.userAUsername = userA.username;
 
-    const codeRes = await ctx.post('auth/test/verification-code', {
-      data: { email, testKey: TEST_API_KEY },
-    });
-    const { code } = await codeRes.json();
-    expect(code).toBeTruthy();
-
-    const verify = await ctx.post('auth/email/verify', { data: { email, code } });
-    expect([200, 201]).toContain(verify.status());
-    const body = await verify.json();
-    if (email === USER_A_EMAIL) {
-      state.userAId = body.user.id;
-      state.userAUsername = body.user.username;
-    } else {
-      state.userBId = body.user.id;
-      state.userBUsername = body.user.username;
-      state.userBDisplayName = body.user.displayName;
-    }
-  }
+  const userB = await seedSupabaseUser(ctx, USER_B_EMAIL);
+  state.userBId = userB.id;
+  state.userBUsername = userB.username;
+  state.userBDisplayName = userB.displayName;
 
   await ctx.dispose();
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 1. Home redirects unauthenticated users to /login
+// 1. Home page renders for unauthenticated visitors; /login is reachable from it
 // ════════════════════════════════════════════════════════════════════════════════
 
-test('home redirects to /login when unauthenticated', async ({ page }) => {
+test('home page renders the landing page for unauthenticated visitors', async ({ page }) => {
   await page.goto('/');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('home-page')).toBeVisible();
+  await expect(page.getByTestId('home-features')).toBeVisible();
+
+  await page.getByTestId('home-cta-login').click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByTestId('login-card')).toBeVisible();
 });
@@ -138,8 +120,31 @@ test('register rejects too-short password', async ({ page }) => {
   await page.goto('/register');
   await page.getByTestId('register-email').fill(`noop.${Date.now()}@x.com`);
   await page.getByTestId('register-password').fill('short');
+  await page.getByTestId('register-confirm-password').fill('short');
   await page.getByTestId('register-submit').click();
   await expect(page.getByTestId('register-error')).toBeVisible();
+});
+
+test('register rejects mismatched password confirmation', async ({ page }) => {
+  await page.goto('/register');
+  await page.getByTestId('register-email').fill(`noop.${Date.now()}@x.com`);
+  await page.getByTestId('register-password').fill('LongEnough123!');
+  await page.getByTestId('register-confirm-password').fill('DoesNotMatch123!');
+  await page.getByTestId('register-submit').click();
+  await expect(page.getByTestId('register-error')).toBeVisible();
+  await expect(page.getByTestId('register-error')).toHaveText(/do not match/i);
+});
+
+test('register with matching passwords creates an account and lands on /chats', async ({ page }) => {
+  const email = `web-register.${Date.now()}@testmail.noalone`;
+  await page.goto('/register');
+  await page.getByTestId('register-email').fill(email);
+  await page.getByTestId('register-password').fill(PASSWORD);
+  await page.getByTestId('register-confirm-password').fill(PASSWORD);
+  await page.getByTestId('register-submit').click();
+  // Auto-confirm is on for this project, so signup lands directly in the app.
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await expect(page.getByTestId('chats-page')).toBeVisible();
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -152,6 +157,25 @@ test('login rejects wrong password', async ({ page }) => {
   await page.getByTestId('login-password').fill('totally-wrong-password');
   await page.getByTestId('login-submit').click();
   await expect(page.getByTestId('login-error')).toBeVisible({ timeout: 10_000 });
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 3b. Forgot password
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('forgot password link goes to the reset form and accepts an email', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-forgot-password').click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.getByTestId('forgot-password-card')).toBeVisible();
+
+  // Supabase's resetPasswordForEmail validates the domain has a real TLD
+  // (unlike admin.createUser), so the suite's .noalone test domain is
+  // rejected here. It doesn't require the account to exist anyway — by
+  // design, to avoid leaking which emails are registered.
+  await page.getByTestId('forgot-password-email').fill(`forgot-test.${Date.now()}@example.com`);
+  await page.getByTestId('forgot-password-submit').click();
+  await expect(page.getByTestId('forgot-password-sent')).toBeVisible({ timeout: 10_000 });
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -285,6 +309,53 @@ test('send a message — optimistic bubble appears in thread', async ({ page }) 
   await expect(page.locator('[data-testid="message"]', { hasText: stamp })).toBeVisible({
     timeout: 5_000,
   });
+});
+
+test('two real browser sessions — sender sees exactly one bubble, receiver gets it live', async ({ browser }) => {
+  test.skip(!state.conversationId || !state.userBUsername, 'No conversation/user B yet');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  try {
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.goto(`/chats/${state.conversationId}`);
+    await expect(pageA.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageB.goto(`/chats/${state.conversationId}`);
+    await expect(pageB.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+    // Let both sockets finish connecting and joining their user:<id> room —
+    // getSocket() returns before the handshake completes.
+    await pageA.waitForTimeout(1000);
+    await pageB.waitForTimeout(1000);
+
+    const stamp = `dup-check-${Date.now()}`;
+    await pageA.getByTestId('composer-input').fill(stamp);
+    await pageA.getByTestId('composer-send').click();
+
+    // Receiver gets it live over the socket, no reload.
+    await expect(pageB.locator('[data-testid="message"]', { hasText: stamp })).toBeVisible({ timeout: 5_000 });
+
+    // Sender must see exactly ONE bubble with this content — not a duplicate
+    // from the optimistic render plus the un-reconciled socket echo.
+    await pageA.waitForTimeout(1000);
+    await expect(pageA.locator('[data-testid="message"]', { hasText: stamp })).toHaveCount(1);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -429,18 +500,21 @@ test('sign out returns to /login', async ({ page }) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 15. Authorize CTA in non-mock mode redirects to Google (URL shape only)
+// 15. "Continue with Google" hands off to Supabase's OAuth authorize endpoint
 // ════════════════════════════════════════════════════════════════════════════════
 
-test('Google sign-in button needs configuration without VITE_GOOGLE_CLIENT_ID', async ({ page }) => {
+test('Continue with Google redirects to Supabase authorize (or surfaces an error)', async ({ page }) => {
   await page.goto('/login');
   await page.getByTestId('login-google').click();
-  // Either error appears (no client id configured) OR it navigated away
-  // (real client id set) — both are acceptable per environment.
-  await page.waitForTimeout(500);
+  // Supabase's signInWithOAuth navigates the page to
+  // <project>.supabase.co/auth/v1/authorize?provider=google&... which then
+  // redirects on to Google — or, if the Google provider isn't enabled in the
+  // Supabase dashboard yet, Supabase bounces back with an error. Both are
+  // acceptable outcomes for this test; a silent no-op is not.
+  await page.waitForTimeout(800);
   const url = page.url();
   const err = await page.getByTestId('login-error').isVisible().catch(() => false);
   if (!err) {
-    expect(url).toMatch(/accounts\.google\.com|oauth/i);
+    expect(url).toMatch(/supabase\.co\/auth\/v1\/authorize|accounts\.google\.com/i);
   }
 });

@@ -20,7 +20,7 @@
 
 import { test, expect, APIRequestContext, request } from '@playwright/test';
 
-const BASE = process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1';
+const BASE = (process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1').replace(/\/?$/, '/');
 const CALLER_TOKEN = process.env.TEST_CALLER_TOKEN || '';
 const RECEIVER_TOKEN = process.env.TEST_RECEIVER_TOKEN || '';
 
@@ -42,7 +42,7 @@ async function receiverCtx(): Promise<APIRequestContext> {
 
 test('GET /calls/authorize-status returns isAuthorized field', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/calls/authorize-status');
+  const res = await ctx.get('calls/authorize-status');
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(body).toHaveProperty('isAuthorized');
@@ -52,7 +52,7 @@ test('GET /calls/authorize-status returns isAuthorized field', async () => {
 
 test('GET /calls/authorize-status requires auth token', async () => {
   const ctx = await request.newContext({ baseURL: BASE });
-  const res = await ctx.get('/calls/authorize-status');
+  const res = await ctx.get('calls/authorize-status');
   expect(res.status()).toBe(401);
   await ctx.dispose();
 });
@@ -61,14 +61,14 @@ test('GET /calls/authorize-status requires auth token', async () => {
 
 test('POST /calls/authorize rejects missing fields', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.post('/calls/authorize', { data: {} });
+  const res = await ctx.post('calls/authorize', { data: {} });
   expect(res.status()).toBe(400);
   await ctx.dispose();
 });
 
 test('POST /calls/authorize rejects invalid OAuth code', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.post('/calls/authorize', {
+  const res = await ctx.post('calls/authorize', {
     data: { code: 'invalid-code', redirectUri: 'https://auth.expo.io/@test/test' },
   });
   // Should be 401 (Google rejects the code) — not a 500 crash
@@ -82,7 +82,7 @@ test('POST /calls/authorize rejects invalid OAuth code', async () => {
 
 test('POST /calls/initiate requires auth', async () => {
   const ctx = await request.newContext({ baseURL: BASE });
-  const res = await ctx.post('/calls/initiate', { data: { receiverId: 'some-id', callType: 'VOICE' } });
+  const res = await ctx.post('calls/initiate', { data: { receiverId: 'some-id', callType: 'VOICE' } });
   expect(res.status()).toBe(401);
   await ctx.dispose();
 });
@@ -90,7 +90,7 @@ test('POST /calls/initiate requires auth', async () => {
 test('POST /calls/initiate validates body shape', async () => {
   const ctx = await callerCtx();
   // missing callType
-  const res = await ctx.post('/calls/initiate', { data: { receiverId: 'not-a-uuid' } });
+  const res = await ctx.post('calls/initiate', { data: { receiverId: 'not-a-uuid' } });
   expect(res.status()).toBe(400);
   const body = await res.json();
   expect(body).toHaveProperty('message');
@@ -100,7 +100,7 @@ test('POST /calls/initiate validates body shape', async () => {
 test('POST /calls/initiate returns 401 if Google not authorized', async () => {
   // This test only passes if caller does NOT have Google authorized
   const ctx = await callerCtx();
-  const statusRes = await ctx.get('/calls/authorize-status');
+  const statusRes = await ctx.get('calls/authorize-status');
   const { isAuthorized } = await statusRes.json();
 
   if (isAuthorized) {
@@ -109,10 +109,10 @@ test('POST /calls/initiate returns 401 if Google not authorized', async () => {
     return;
   }
 
-  const receiverInfoRes = await (await receiverCtx()).get('/users/me');
+  const receiverInfoRes = await (await receiverCtx()).get('users/me');
   const receiver = await receiverInfoRes.json();
 
-  const res = await ctx.post('/calls/initiate', {
+  const res = await ctx.post('calls/initiate', {
     data: { receiverId: receiver.id, callType: 'VOICE' },
   });
   expect(res.status()).toBe(401);
@@ -123,28 +123,28 @@ test('POST /calls/initiate returns 401 if Google not authorized', async () => {
 
 test('POST /calls/:id/accept returns 404 for unknown call', async () => {
   const ctx = await receiverCtx();
-  const res = await ctx.post('/calls/nonexistent-id/accept');
+  const res = await ctx.post('calls/nonexistent-id/accept');
   expect(res.status()).toBe(404);
   await ctx.dispose();
 });
 
 test('POST /calls/:id/decline returns 404 for unknown call', async () => {
   const ctx = await receiverCtx();
-  const res = await ctx.post('/calls/nonexistent-id/decline');
+  const res = await ctx.post('calls/nonexistent-id/decline');
   expect(res.status()).toBe(404);
   await ctx.dispose();
 });
 
 test('POST /calls/:id/cancel returns 404 for unknown call', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.post('/calls/nonexistent-id/cancel');
+  const res = await ctx.post('calls/nonexistent-id/cancel');
   expect(res.status()).toBe(404);
   await ctx.dispose();
 });
 
 test('POST /calls/:id/end returns 404 for unknown call', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.post('/calls/nonexistent-id/end');
+  const res = await ctx.post('calls/nonexistent-id/end');
   expect(res.status()).toBe(404);
   await ctx.dispose();
 });
@@ -153,7 +153,7 @@ test('POST /calls/:id/end returns 404 for unknown call', async () => {
 
 test('GET /calls/history returns array', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/calls/history');
+  const res = await ctx.get('calls/history');
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(Array.isArray(body)).toBe(true);
@@ -162,14 +162,14 @@ test('GET /calls/history returns array', async () => {
 
 test('GET /calls/history requires auth', async () => {
   const ctx = await request.newContext({ baseURL: BASE });
-  const res = await ctx.get('/calls/history');
+  const res = await ctx.get('calls/history');
   expect(res.status()).toBe(401);
   await ctx.dispose();
 });
 
 test('GET /calls/history entries have expected shape', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/calls/history?limit=5');
+  const res = await ctx.get('calls/history?limit=5');
   expect(res.status()).toBe(200);
   const body: any[] = await res.json();
   if (body.length > 0) {
@@ -187,8 +187,8 @@ test('GET /calls/history entries have expected shape', async () => {
 
 test('GET /calls/history pagination works', async () => {
   const ctx = await callerCtx();
-  const page1 = await (await ctx.get('/calls/history?page=1&limit=2')).json();
-  const page2 = await (await ctx.get('/calls/history?page=2&limit=2')).json();
+  const page1 = await (await ctx.get('calls/history?page=1&limit=2')).json();
+  const page2 = await (await ctx.get('calls/history?page=2&limit=2')).json();
   expect(Array.isArray(page1)).toBe(true);
   expect(Array.isArray(page2)).toBe(true);
   // No overlap between pages
@@ -203,7 +203,7 @@ test('Caller cannot accept their own call', async () => {
   // Receiver must accept, not the caller
   // We test this by using the caller token to accept a non-existent call
   const ctx = await callerCtx();
-  const res = await ctx.post('/calls/fake-call-id/accept');
+  const res = await ctx.post('calls/fake-call-id/accept');
   expect([403, 404]).toContain(res.status());
   await ctx.dispose();
 });
@@ -212,7 +212,7 @@ test('Caller cannot accept their own call', async () => {
 
 test('GET /chat/conversations still works after call feature added', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/chat/conversations');
+  const res = await ctx.get('chat/conversations');
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(Array.isArray(body)).toBe(true);
@@ -221,7 +221,7 @@ test('GET /chat/conversations still works after call feature added', async () =>
 
 test('GET /users/me still works', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/users/me');
+  const res = await ctx.get('users/me');
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(body).toHaveProperty('id');
@@ -231,7 +231,7 @@ test('GET /users/me still works', async () => {
 
 test('GET /rooms still works', async () => {
   const ctx = await callerCtx();
-  const res = await ctx.get('/rooms');
+  const res = await ctx.get('rooms');
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(Array.isArray(body)).toBe(true);

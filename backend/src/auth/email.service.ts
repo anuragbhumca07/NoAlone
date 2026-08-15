@@ -12,13 +12,13 @@ import { Resend } from 'resend';
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private resend = new Resend(process.env.RESEND_API_KEY);
+  private resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
   async sendVerificationEmail(email: string, code: string): Promise<void> {
     // Always log first so the code is recoverable if delivery silently fails.
     this.logger.log(`[VERIFICATION CODE] email=${email} code=${code}`);
 
-    if (!process.env.RESEND_API_KEY) {
+    if (!this.resend) {
       this.logger.warn('RESEND_API_KEY not set — skipping email send');
       return;
     }

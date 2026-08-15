@@ -38,3 +38,9 @@ export class GoogleMobileDto {
   @IsString()
   accessToken: string;
 }
+
+export class SupabaseSyncDto {
+  @ApiProperty({ description: 'Supabase session access token from the client' })
+  @IsString()
+  accessToken: string;
+}

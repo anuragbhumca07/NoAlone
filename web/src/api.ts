@@ -62,6 +62,13 @@ export const api = {
       body: JSON.stringify({ accessToken }),
     }),
 
+  // Exchanges a Supabase session for a noAlone backend session.
+  supabaseSync: (accessToken: string) =>
+    request<{ token: string; user: any; isNew: boolean }>('auth/supabase-sync', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken }),
+    }),
+
   // Test helper — only used by the verify page if running E2E
   testGetCode: (email: string, testKey: string) =>
     request<{ code: string | null }>('auth/test/verification-code', {

@@ -20,9 +20,11 @@ export default function Profile() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const me = await api.getMe();
+        if (cancelled) return;
         setForm({
           username: me.username || '',
           displayName: me.displayName || '',
@@ -34,9 +36,10 @@ export default function Profile() {
         });
         auth.setUser({ ...(user || {}), ...me } as any);
       } catch (e: any) {
-        setErr(e?.message || 'Could not load profile');
+        if (!cancelled) setErr(e?.message || 'Could not load profile');
       }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from './email.service';
+import { SupabaseService } from './supabase.service';
 import { SendOtpDto, VerifyOtpDto } from './dto/login.dto';
 import { EmailRegisterDto, EmailVerifyDto, EmailLoginDto } from './dto/email-auth.dto';
 
@@ -19,6 +20,7 @@ export class AuthService {
     private jwtService: JwtService,
     private redis: RedisService,
     private emailService: EmailService,
+    private supabase: SupabaseService,
   ) {}
 
   private generateOtp(): string {
@@ -246,6 +248,85 @@ export class AuthService {
 
   async updateFcmToken(userId: string, fcmToken: string): Promise<void> {
     await this.prisma.user.update({ where: { id: userId }, data: { fcmToken } });
+  }
+
+  // ─── Supabase Auth (web login/signup/logout + Google) ─────────────────────────
+
+  /**
+   * Exchanges a Supabase session access token for a noAlone session. Supabase
+   * is the source of truth for credentials (password hashing, email
+   * confirmation, Google OAuth) — this just mirrors the identity into our own
+   * User table (keyed by supabaseId) so existing app features (chat, calls,
+   * profile) keep working unchanged behind the existing JWT guards.
+   */
+  async syncSupabaseUser(accessToken: string): Promise<{ token: string; user: any; isNew: boolean }> {
+    const { data, error } = await this.supabase.client.auth.getUser(accessToken);
+    if (error || !data?.user) {
+      throw new UnauthorizedException('Invalid or expired Supabase session');
+    }
+
+    const su = data.user;
+    if (!su.email) {
+      throw new BadRequestException('Supabase account has no email');
+    }
+
+    let user = await this.prisma.user.findFirst({
+      where: { OR: [{ supabaseId: su.id }, { email: su.email }] },
+    });
+
+    const meta = (su.user_metadata || {}) as Record<string, any>;
+    let isNew = false;
+
+    if (!user) {
+      isNew = true;
+      const username = this.generateUsername();
+      user = await this.prisma.user.create({
+        data: {
+          supabaseId: su.id,
+          email: su.email,
+          username,
+          displayName: meta.full_name || meta.name || username,
+          avatarUrl: meta.avatar_url || meta.picture || null,
+          emailVerified: !!su.email_confirmed_at,
+        },
+      });
+    } else if (!user.supabaseId) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          supabaseId: su.id,
+          emailVerified: user.emailVerified || !!su.email_confirmed_at,
+        },
+      });
+    }
+
+    const token = this.jwtService.sign({ sub: user.id, username: user.username });
+    return { token, user, isNew };
+  }
+
+  /**
+   * Test-only helper: creates (or reuses) a pre-confirmed Supabase user and
+   * returns a session access token, so Playwright can seed users without
+   * needing real email delivery. Gated by TEST_API_KEY at the controller.
+   */
+  async devCreateSupabaseTestUser(email: string, password: string): Promise<{ accessToken: string }> {
+    const { error: createErr } = await this.supabase.client.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (createErr && !/already.*registered|already exists/i.test(createErr.message)) {
+      throw new BadRequestException(createErr.message);
+    }
+
+    const { data: signIn, error: signInErr } = await this.supabase.client.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInErr || !signIn?.session) {
+      throw new BadRequestException(signInErr?.message || 'Could not sign in test user');
+    }
+    return { accessToken: signIn.session.access_token };
   }
 
   // ─── Web-based Google (kept for completeness, not used by mobile) ─────────────

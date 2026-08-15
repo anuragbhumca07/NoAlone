@@ -75,8 +75,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const otherUserId = conv.user1Id === client.data.userId ? conv.user2Id : conv.user1Id;
 
-      // Emit to both users
-      this.server.to(`user:${client.data.userId}`).emit('message:new', message);
+      // Echo back to the sender (other tabs/devices of the same account) with
+      // the client's optimistic tempId attached so it can reconcile instead
+      // of rendering a duplicate bubble.
+      this.server.to(`user:${client.data.userId}`).emit('message:new', { ...message, tempId: data.tempId });
       this.server.to(`user:${otherUserId}`).emit('message:new', message);
 
       // Send push notification if offline

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { auth, useAuth } from '../store';
 import { getSocket, closeSocket } from '../socket';
 import { api } from '../api';
+import { supabase } from '../supabaseClient';
 import StatusToggle from './StatusToggle';
 import IncomingCallModal from './IncomingCallModal';
 import type { IncomingCallPayload } from '../types';
@@ -42,6 +43,7 @@ export default function AppShell() {
 
   const handleLogout = () => {
     closeSocket();
+    supabase.auth.signOut().catch(() => {});
     auth.clear();
     navigate('/login');
   };

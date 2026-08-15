@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { auth } from '../store';
+import { supabase } from '../supabaseClient';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,30 +16,26 @@ export default function Login() {
     setError(null);
     setBusy(true);
     try {
-      const res = await api.loginEmail(email, password);
+      const { data, error: supaErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (supaErr) throw supaErr;
+      if (!data.session) throw new Error('Sign-in did not return a session');
+
+      const res = await api.supabaseSync(data.session.access_token);
       auth.setSession(res.token, res.user);
       navigate('/chats');
     } catch (e: any) {
-      if (e instanceof ApiError && e.status === 400 && /verify/i.test(e.message)) {
-        navigate('/verify', { state: { email } });
-        return;
-      }
-      setError(e?.message || 'Login failed');
+      const message = e instanceof ApiError ? e.message : e?.message || 'Login failed';
+      setError(message);
     } finally { setBusy(false); }
   };
 
-  const startGoogle = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setError('Google sign-in not configured. Set VITE_GOOGLE_CLIENT_ID in web/.env');
-      return;
-    }
-    const redirectUri = `${location.origin}/oauth/google`;
-    const scope = encodeURIComponent(
-      'openid email profile https://www.googleapis.com/auth/calendar.events'
-    );
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&include_granted_scopes=true&state=signin`;
-    location.href = url;
+  const startGoogle = async () => {
+    setError(null);
+    const { error: supaErr } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${location.origin}/oauth/google` },
+    });
+    if (supaErr) setError(supaErr.message);
   };
 
   return (
@@ -58,7 +55,12 @@ export default function Login() {
             placeholder="you@example.com"
           />
 
-          <label>Password</label>
+          <div className="spread">
+            <label style={{ margin: '12px 0 6px' }}>Password</label>
+            <Link to="/forgot-password" style={{ fontSize: 13 }} data-testid="login-forgot-password">
+              Forgot password?
+            </Link>
+          </div>
           <input
             type="password"
             value={password}

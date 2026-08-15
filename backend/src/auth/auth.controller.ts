@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { AuthService } from './auth.service';
 import { SendOtpDto, VerifyOtpDto } from './dto/login.dto';
-import { EmailRegisterDto, EmailVerifyDto, EmailLoginDto, GoogleMobileDto } from './dto/email-auth.dto';
+import { EmailRegisterDto, EmailVerifyDto, EmailLoginDto, GoogleMobileDto, SupabaseSyncDto } from './dto/email-auth.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -68,6 +68,14 @@ export class AuthController {
     return this.authService.recoverVerificationCode(dto.email, dto.password);
   }
 
+  // ─── Supabase Auth (web login/signup/logout + Google) ────────────────────────
+
+  @Post('supabase-sync')
+  @ApiOperation({ summary: 'Exchange a Supabase session for a noAlone session' })
+  supabaseSync(@Body() dto: SupabaseSyncDto) {
+    return this.authService.syncSupabaseUser(dto.accessToken);
+  }
+
   // ─── Test Helper (only active when TEST_API_KEY env var is set) ─────────────
 
   @Post('test/verification-code')
@@ -76,6 +84,14 @@ export class AuthController {
     const testKey = process.env.TEST_API_KEY;
     if (!testKey || body.testKey !== testKey) throw new ForbiddenException();
     return this.authService.devGetVerificationCode(body.email);
+  }
+
+  @Post('test/supabase-seed-user')
+  @ApiOperation({ summary: 'Create + confirm a Supabase test user, return an access token (test-only)' })
+  async testSeedSupabaseUser(@Body() body: { email: string; password: string; testKey: string }) {
+    const testKey = process.env.TEST_API_KEY;
+    if (!testKey || body.testKey !== testKey) throw new ForbiddenException();
+    return this.authService.devCreateSupabaseTestUser(body.email, body.password);
   }
 
   // ─── Web OAuth (not used by mobile) ──────────────────────────────────────────
