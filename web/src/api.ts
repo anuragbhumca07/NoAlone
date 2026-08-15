@@ -124,6 +124,21 @@ export const api = {
   endCall: (callId: string) =>
     request<{ success: boolean }>(`calls/${callId}/end`, { method: 'POST' }),
   callHistory: () => request<any[]>('calls/history'),
+
+  // ── Moderation ──
+  reportUser: (reportedUserId: string, reason: string, description?: string) =>
+    request<any>('moderation/report', {
+      method: 'POST',
+      body: JSON.stringify({ reportedUserId, reason, description }),
+    }),
+  blockUser: (blockedUserId: string) =>
+    request<any>('moderation/block', { method: 'POST', body: JSON.stringify({ blockedUserId }) }),
+  unblockUser: (userId: string) =>
+    request<{ success: boolean }>(`moderation/block/${userId}`, { method: 'DELETE' }),
+  getBlockedUsers: () => request<any[]>('moderation/blocked'),
+
+  // ── Random matching ──
+  matchHistory: () => request<any[]>('matching/history'),
 };
 
 export { API_URL };

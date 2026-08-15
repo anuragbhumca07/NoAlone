@@ -207,12 +207,42 @@ test('sidebar navigation hits Chats / Calls / Profile', async ({ page }) => {
   await expect(page).toHaveURL(/\/calls$/);
   await expect(page.getByTestId('calls-page')).toBeVisible();
 
+  await page.getByTestId('nav-random').click();
+  await expect(page).toHaveURL(/\/random$/);
+  await expect(page.getByTestId('random-chat-page')).toBeVisible();
+
   await page.getByTestId('nav-profile').click();
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByTestId('profile-page')).toBeVisible();
 
   await page.getByTestId('nav-chats').click();
   await expect(page).toHaveURL(/\/chats$/);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 5b. Random chat page — UI renders, gender filter selectable
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('/random shows online count and gender filter, start toggles searching state', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/);
+
+  await page.goto('/random');
+  await expect(page.getByTestId('random-chat-page')).toBeVisible();
+  await expect(page.getByTestId('random-online-count')).toBeVisible({ timeout: 10_000 });
+
+  await expect(page.getByTestId('gender-pref-ANY')).toBeVisible();
+  await expect(page.getByTestId('gender-pref-FEMALE')).toBeVisible();
+  await expect(page.getByTestId('gender-pref-MALE')).toBeVisible();
+  await page.getByTestId('gender-pref-FEMALE').click();
+
+  await page.getByTestId('random-start').click();
+  await expect(page.getByTestId('random-searching')).toBeVisible({ timeout: 5_000 });
+  await page.getByTestId('random-cancel').click();
+  await expect(page.getByTestId('random-start')).toBeVisible({ timeout: 5_000 });
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -532,6 +562,75 @@ test('unread badge appears on nav + conversation row until the thread is opened'
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// 9e. Random matching — two users both hit Start and land in the same conversation
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('random match pairs two searching users into a shared conversation', async ({ browser }) => {
+  test.skip(!state.userAId || !state.userBId, 'No seeded users yet');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  try {
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.goto('/random');
+    await expect(pageA.getByTestId('random-chat-page')).toBeVisible();
+
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageB.goto('/random');
+    await expect(pageB.getByTestId('random-chat-page')).toBeVisible();
+
+    await pageA.getByTestId('random-start').click();
+    await expect(pageA.getByTestId('random-searching')).toBeVisible({ timeout: 5_000 });
+    await pageB.getByTestId('random-start').click();
+
+    // Matching gateway polls every 2s — both should land in the same
+    // conversation thread within a few cycles.
+    await expect(pageA).toHaveURL(/\/chats\/[^/]+$/, { timeout: 15_000 });
+    await expect(pageB).toHaveURL(/\/chats\/[^/]+$/, { timeout: 15_000 });
+
+    const convIdA = pageA.url().split('/').pop();
+    const convIdB = pageB.url().split('/').pop();
+    expect(convIdA).toBe(convIdB);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 9f. Safety — report a user from the conversation header
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('report a user from the conversation shows a confirmation', async ({ page }) => {
+  test.skip(!state.conversationId, 'No conversation yet');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await page.goto(`/chats/${state.conversationId}`);
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('safety-menu-toggle').click();
+  await expect(page.getByTestId('safety-menu')).toBeVisible();
+  await page.getByTestId('report-SPAM').click();
+  await expect(page.getByTestId('safety-message')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('safety-menu')).toBeHidden();
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // 10. Call CTAs: Authorize Google + start mock voice call → incoming modal
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -754,4 +853,44 @@ test('oauth callback with state=calls calls our backend, not Supabase', async ({
 
   expect(hitOurBackend, 'expected a request to our backend /calls/authorize').toBe(true);
   expect(hitSupabaseTokenExchange, 'must NOT hand the Calendar auth code to Supabase').toBe(false);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 17. Safety — blocking a user hides them from search
+// ════════════════════════════════════════════════════════════════════════════════
+//
+// Uses a throwaway pair of seeded users (not state.userAId/userBId) so this
+// destructive action can't contaminate any earlier test in the suite.
+
+test('blocking a user removes them from search results', async ({ page, playwright }) => {
+  const baseURL = BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`;
+  const ctx = await playwright.request.newContext({ baseURL });
+  const emailC = `web-c.${Date.now()}@testmail.noalone`;
+  const emailD = `web-d.${Date.now()}@testmail.noalone`;
+  const userC = await seedSupabaseUser(ctx, emailC);
+  const userD = await seedSupabaseUser(ctx, emailD);
+  await ctx.dispose();
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(emailC);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  // Baseline: D is findable before any block.
+  await page.getByTestId('user-search').fill(userD.username);
+  await expect(page.getByTestId(`user-result-${userD.id}`)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId(`user-result-${userD.id}`).click();
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('safety-menu-toggle').click();
+  await page.getByTestId('block-user').click();
+  await expect(page.getByTestId('safety-message')).toContainText(/blocked/i, { timeout: 10_000 });
+
+  // After blocking, D no longer shows up in search.
+  await page.getByTestId('back-to-chats').click();
+  await expect(page.getByTestId('chats-page')).toBeVisible();
+  await page.getByTestId('user-search').fill(userD.username);
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId(`user-result-${userD.id}`)).toBeHidden();
 });

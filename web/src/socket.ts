@@ -34,4 +34,32 @@ export function getSocket(token: string | null): Socket | null {
 
 export function closeSocket() {
   if (current) { current.disconnect(); current = null; currentToken = null; }
+  closeMatchingSocket();
+}
+
+// Separate namespace/connection for the random-match ("meet someone new")
+// gateway — kept independent from the chat socket above so leaving the
+// matching page can drop it without touching the chat connection.
+let matching: Socket | null = null;
+let matchingToken: string | null = null;
+
+export function getMatchingSocket(token: string | null): Socket | null {
+  if (!token) {
+    if (matching) { matching.disconnect(); matching = null; matchingToken = null; }
+    return null;
+  }
+  if (matching && matchingToken === token) return matching;
+  if (matching) matching.disconnect();
+
+  matchingToken = token;
+  matching = io(`${SOCKET_URL}/matching`, {
+    auth: { token },
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+  });
+  return matching;
+}
+
+export function closeMatchingSocket() {
+  if (matching) { matching.disconnect(); matching = null; matchingToken = null; }
 }

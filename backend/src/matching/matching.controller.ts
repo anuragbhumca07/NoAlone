@@ -2,12 +2,13 @@ import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MatchingService } from './matching.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { IsOptional, IsString, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsIn } from 'class-validator';
 
 class JoinPoolDto {
   @IsOptional() @IsString() language?: string;
   @IsOptional() @IsString() ageGroup?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) interests?: string[];
+  @IsOptional() @IsIn(['ANY', 'MALE', 'FEMALE', 'OTHER']) genderPreference?: string;
 }
 
 @ApiTags('Matching')

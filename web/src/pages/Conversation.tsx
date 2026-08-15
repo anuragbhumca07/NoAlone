@@ -37,6 +37,8 @@ export default function Conversation() {
   const [otherUser, setOtherUser] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  const [safetyMsg, setSafetyMsg] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -200,6 +202,28 @@ export default function Conversation() {
     location.href = url;
   };
 
+  const reportUser = async (reason: string) => {
+    if (!otherUser) return;
+    try {
+      await api.reportUser(otherUser.id, reason);
+      setSafetyMsg('Reported. Our team will review this.');
+    } catch (e: any) {
+      setSafetyMsg(e?.message || 'Could not submit report');
+    }
+    setSafetyOpen(false);
+  };
+
+  const blockUser = async () => {
+    if (!otherUser) return;
+    try {
+      await api.blockUser(otherUser.id);
+      setSafetyMsg('Blocked. They can no longer message or call you.');
+    } catch (e: any) {
+      setSafetyMsg(e?.message || 'Could not block user');
+    }
+    setSafetyOpen(false);
+  };
+
   return (
     <div className="thread" data-testid="conversation-page">
       <div className="thread-header">
@@ -213,7 +237,7 @@ export default function Conversation() {
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row" style={{ position: 'relative' }}>
           {authorized === false && (
             <button className="ghost" onClick={startAuthorize} data-testid="authorize-calls">
               Authorize Google
@@ -225,8 +249,46 @@ export default function Conversation() {
           <button onClick={() => startCall('VIDEO')} disabled={!otherUser} data-testid="start-video-call">
             🎥 Video call
           </button>
+          <button
+            className="ghost"
+            onClick={() => setSafetyOpen((o) => !o)}
+            disabled={!otherUser}
+            data-testid="safety-menu-toggle"
+            title="Report or block"
+          >
+            ⋮
+          </button>
+          {safetyOpen && (
+            <div className="card" data-testid="safety-menu" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 10, minWidth: 200 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Report for…</div>
+              {['SPAM', 'HARASSMENT', 'INAPPROPRIATE_CONTENT', 'FAKE_PROFILE', 'OTHER'].map((reason) => (
+                <button
+                  key={reason}
+                  className="ghost"
+                  style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 4 }}
+                  onClick={() => reportUser(reason)}
+                  data-testid={`report-${reason}`}
+                >
+                  {reason.replace(/_/g, ' ').toLowerCase()}
+                </button>
+              ))}
+              <button
+                className="danger"
+                style={{ display: 'block', width: '100%', marginTop: 8 }}
+                onClick={blockUser}
+                data-testid="block-user"
+              >
+                Block user
+              </button>
+            </div>
+          )}
         </div>
       </div>
+      {safetyMsg && (
+        <div className="ok" data-testid="safety-message" style={{ margin: '8px 16px 0' }}>
+          {safetyMsg}
+        </div>
+      )}
 
       <div className="messages" ref={scrollRef} data-testid="messages">
         {err && <div className="err">{err}</div>}

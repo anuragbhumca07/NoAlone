@@ -13,6 +13,7 @@ import { ChatService } from './chat.service';
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
@@ -31,6 +32,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private redis: RedisService,
     private usersService: UsersService,
     private notificationsService: NotificationsService,
+    private moderationService: ModerationService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -66,6 +68,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('message:send')
   async handleMessage(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
     try {
+      // Fail-open: if the block lookup itself errors, don't let that break sending.
+      const blocked = await this.moderationService
+        .isBlocked(client.data.userId, data.targetUserId)
+        .catch(() => false);
+      if (blocked) return { success: false, error: 'This conversation is unavailable.' };
+
       const message = await this.chatService.saveMessage(client.data.userId, data);
 
       // Get conversation to find the other user

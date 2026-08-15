@@ -7,6 +7,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private connected = false;
 
+  // In-process fallback used whenever Redis is unreachable, so presence and
+  // matching keep working (single-instance semantics only) instead of
+  // silently no-oping. Real Redis is still used whenever it's up so state
+  // stays correct across multiple backend instances.
+  private memOnlineUsers = new Set<string>();
+  private memMatchingPool = new Map<string, { data: any; expiresAt: number }>();
+
   onModuleInit() {
     try {
       this.client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -60,6 +67,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setUserOnline(userId: string, socketId: string): Promise<void> {
+    this.memOnlineUsers.add(userId);
     if (!this.isReady()) return;
     try {
       await this.client!.setex(`online:${userId}`, 300, socketId);
@@ -68,6 +76,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setUserOffline(userId: string): Promise<void> {
+    this.memOnlineUsers.delete(userId);
     if (!this.isReady()) return;
     try {
       await this.client!.del(`online:${userId}`);
@@ -76,19 +85,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async isUserOnline(userId: string): Promise<boolean> {
-    if (!this.isReady()) return false;
+    if (!this.isReady()) return this.memOnlineUsers.has(userId);
     try {
       const result = await this.client!.exists(`online:${userId}`);
       return result === 1;
-    } catch { return false; }
+    } catch { return this.memOnlineUsers.has(userId); }
   }
 
   async getOnlineUsers(): Promise<string[]> {
-    if (!this.isReady()) return [];
-    try { return await this.client!.smembers('online_users'); } catch { return []; }
+    if (!this.isReady()) return Array.from(this.memOnlineUsers);
+    try { return await this.client!.smembers('online_users'); } catch { return Array.from(this.memOnlineUsers); }
   }
 
   async addToMatchingPool(userId: string, data: object): Promise<void> {
+    this.memMatchingPool.set(userId, { data, expiresAt: Date.now() + 120_000 });
     if (!this.isReady()) return;
     try {
       await this.client!.setex(`matching:${userId}`, 120, JSON.stringify(data));
@@ -97,6 +107,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async removeFromMatchingPool(userId: string): Promise<void> {
+    this.memMatchingPool.delete(userId);
     if (!this.isReady()) return;
     try {
       await this.client!.del(`matching:${userId}`);
@@ -105,16 +116,30 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getMatchingPool(): Promise<string[]> {
-    if (!this.isReady()) return [];
-    try { return await this.client!.smembers('matching_pool'); } catch { return []; }
+    if (!this.isReady()) return this.memPoolIds();
+    try { return await this.client!.smembers('matching_pool'); } catch { return this.memPoolIds(); }
   }
 
   async getMatchingData(userId: string): Promise<any | null> {
-    if (!this.isReady()) return null;
+    if (!this.isReady()) return this.memPoolGet(userId);
     try {
       const data = await this.client!.get(`matching:${userId}`);
       return data ? JSON.parse(data) : null;
-    } catch { return null; }
+    } catch { return this.memPoolGet(userId); }
+  }
+
+  private memPoolGet(userId: string): any | null {
+    const entry = this.memMatchingPool.get(userId);
+    if (!entry) return null;
+    if (entry.expiresAt < Date.now()) { this.memMatchingPool.delete(userId); return null; }
+    return entry.data;
+  }
+
+  private memPoolIds(): string[] {
+    const now = Date.now();
+    return Array.from(this.memMatchingPool.entries())
+      .filter(([, entry]) => entry.expiresAt >= now)
+      .map(([id]) => id);
   }
 
   async publish(channel: string, message: string): Promise<void> {

@@ -12,10 +12,13 @@ export class MatchingService {
     private notifications: NotificationsService,
   ) {}
 
-  async joinPool(userId: string, preferences: { language?: string; ageGroup?: string; interests?: string[] }) {
+  async joinPool(
+    userId: string,
+    preferences: { language?: string; ageGroup?: string; interests?: string[]; genderPreference?: string },
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, language: true, age: true, interests: true, displayName: true, avatarUrl: true },
+      select: { id: true, language: true, age: true, interests: true, displayName: true, avatarUrl: true, gender: true },
     });
 
     await this.redis.addToMatchingPool(userId, {
@@ -25,6 +28,10 @@ export class MatchingService {
       interests: preferences.interests || user.interests,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      gender: user.gender,
+      genderPreference: preferences.genderPreference && preferences.genderPreference !== 'ANY'
+        ? preferences.genderPreference
+        : undefined,
       joinedAt: Date.now(),
     });
 
@@ -59,6 +66,10 @@ export class MatchingService {
     for (const candidateId of candidates) {
       const candidateData = await this.redis.getMatchingData(candidateId);
       if (!candidateData) continue;
+
+      // Mutual gender preference — both sides' filters have to pass, when set.
+      if (myData.genderPreference && candidateData.gender !== myData.genderPreference) continue;
+      if (candidateData.genderPreference && myData.gender !== candidateData.genderPreference) continue;
 
       let score = 0;
       if (candidateData.language === myData.language) score += 10;
