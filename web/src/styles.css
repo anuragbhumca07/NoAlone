@@ -100,8 +100,24 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
   padding: 10px 12px;
   color: var(--text-dim);
   border-radius: 8px;
+  justify-content: space-between;
 }
 .sidebar a.active, .sidebar a:hover { background: var(--panel-2); color: var(--text); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
 
 .main { overflow: auto; padding: 24px; }
 
@@ -158,6 +174,19 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
   background: var(--panel-2);
 }
 .bubble.mine { background: var(--accent); align-self: flex-end; }
+.bubble-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+}
+.bubble:not(.mine) .bubble-meta { color: var(--text-dim); justify-content: flex-start; }
+.tick { display: inline-flex; }
+.tick.tick-read { color: #53bdff; }
+.tick.tick-sent, .tick.tick-delivered { color: rgba(255,255,255,0.7); }
 .composer {
   display: flex; gap: 8px;
   padding: 12px;

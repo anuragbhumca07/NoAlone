@@ -133,6 +133,26 @@ export class ChatService {
     });
   }
 
+  /**
+   * Marks a message as delivered (the recipient's client received it over
+   * the socket) and returns who to notify — null if the message doesn't
+   * exist, the caller is the sender (can't deliver to yourself), or it was
+   * already marked delivered (avoid redundant broadcasts).
+   */
+  async markDelivered(messageId: string, recipientId: string): Promise<{ senderId: string; conversationId: string | null } | null> {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { senderId: true, conversationId: true, deliveredAt: true },
+    });
+    if (!message || message.senderId === recipientId || message.deliveredAt) return null;
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { deliveredAt: new Date() },
+    });
+    return { senderId: message.senderId, conversationId: message.conversationId };
+  }
+
   async getUnreadCount(userId: string) {
     const conversations = await this.prisma.conversation.findMany({
       where: { OR: [{ user1Id: userId }, { user2Id: userId }] },

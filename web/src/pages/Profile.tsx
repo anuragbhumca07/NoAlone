@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { auth, useAuth } from '../store';
+import { supabase } from '../supabaseClient';
+import { RINGTONE_NAMES, getRingtonePreference, setRingtonePreference, startRingtone, type RingtoneName } from '../sounds';
 
 const GENDERS = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] as const;
 
@@ -18,6 +20,13 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const [ringtone, setRingtone] = useState<RingtoneName>(getRingtonePreference());
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwErr, setPwErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +76,35 @@ export default function Profile() {
     } catch (e: any) {
       setErr(e?.message || 'Save failed');
     } finally { setBusy(false); }
+  };
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwMsg(null);
+    setPwErr(null);
+    if (newPassword.length < 8) {
+      setPwErr('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPwErr('Passwords do not match.');
+      return;
+    }
+    setPwBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPwMsg('Password updated.');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (e: any) {
+      setPwErr(e?.message || 'Could not update password');
+    } finally { setPwBusy(false); }
+  };
+
+  const changeRingtone = (name: RingtoneName) => {
+    setRingtone(name);
+    setRingtonePreference(name);
   };
 
   return (
@@ -157,6 +195,64 @@ export default function Profile() {
           {busy ? 'Saving…' : 'Save changes'}
         </button>
       </form>
+
+      <form onSubmit={changePassword} className="card" style={{ maxWidth: 640, marginTop: 24 }} data-testid="change-password-card">
+        <h3 style={{ marginTop: 0 }}>Change password</h3>
+
+        <label>New password <span style={{ color: 'var(--text-dim)' }}>(min 8 chars)</span></label>
+        <input
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+          data-testid="change-password-new"
+        />
+
+        <label>Confirm new password</label>
+        <input
+          type="password"
+          value={confirmNewPassword}
+          onChange={(e) => setConfirmNewPassword(e.target.value)}
+          required
+          data-testid="change-password-confirm"
+        />
+
+        {pwMsg && <div className="ok" data-testid="change-password-saved">{pwMsg}</div>}
+        {pwErr && <div className="err" data-testid="change-password-error">{pwErr}</div>}
+
+        <button type="submit" disabled={pwBusy} style={{ marginTop: 16 }} data-testid="change-password-submit">
+          {pwBusy ? 'Updating…' : 'Update password'}
+        </button>
+      </form>
+
+      <div className="card" style={{ maxWidth: 640, marginTop: 24 }} data-testid="ringtone-card">
+        <h3 style={{ marginTop: 0 }}>Ringtone</h3>
+        <p style={{ color: 'var(--text-dim)', marginTop: 0, fontSize: 13 }}>
+          Played when someone calls you.
+        </p>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {RINGTONE_NAMES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={ringtone === name ? '' : 'ghost'}
+              onClick={() => changeRingtone(name)}
+              data-testid={`ringtone-${name}`}
+              style={{ textTransform: 'capitalize' }}
+            >
+              {name}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => { const stop = startRingtone(ringtone); setTimeout(stop, 1800); }}
+            data-testid="ringtone-preview"
+          >
+            ▶ Preview
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

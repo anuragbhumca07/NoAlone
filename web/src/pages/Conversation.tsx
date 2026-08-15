@@ -3,7 +3,30 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../store';
 import { getSocket } from '../socket';
+import { chatStore } from '../chatStore';
+import { callStore } from '../callStore';
 import type { Message } from '../types';
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (sameDay) return time;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const date = d.toLocaleDateString([], sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${date}, ${time}`;
+}
+
+function Tick({ m }: { m: Message }) {
+  if (m.isRead) {
+    return <span className="tick tick-read" data-testid="tick-read" title="Read">✓✓</span>;
+  }
+  if (m.deliveredAt) {
+    return <span className="tick tick-delivered" data-testid="tick-delivered" title="Delivered">✓✓</span>;
+  }
+  return <span className="tick tick-sent" data-testid="tick-sent" title="Sent">✓</span>;
+}
 
 export default function Conversation() {
   const { id } = useParams();
@@ -42,12 +65,26 @@ export default function Conversation() {
     })();
   }, [id]);
 
+  // Opening a conversation marks everything in it as read.
+  useEffect(() => {
+    if (!id || !token || !otherUser) return;
+    chatStore.clear(id);
+    const socket = getSocket(token);
+    socket?.emit('message:read', { conversationId: id, targetUserId: otherUser.id });
+  }, [id, token, otherUser]);
+
   useEffect(() => {
     if (!token || !id) return;
     const socket = getSocket(token);
     if (!socket) return;
+
     const onNew = (msg: Message & { tempId?: string }) => {
       if (msg.conversationId !== id) return;
+      // I'm actively viewing this thread — it's effectively read immediately.
+      if (msg.senderId !== user?.id) {
+        chatStore.clear(id);
+        socket.emit('message:read', { conversationId: id, targetUserId: msg.senderId });
+      }
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         // Reconcile with our own optimistic bubble instead of duplicating it.
@@ -57,9 +94,27 @@ export default function Conversation() {
         return [...prev, msg];
       });
     };
+
+    const onDelivered = (data: { messageId: string; conversationId: string | null }) => {
+      if (data.conversationId !== id) return;
+      setMessages((prev) => prev.map((m) => (m.id === data.messageId ? { ...m, deliveredAt: new Date().toISOString() } : m)));
+    };
+
+    const onRead = (data: { conversationId: string; userId: string }) => {
+      if (data.conversationId !== id || data.userId !== otherUser?.id) return;
+      // The other person read the thread — all of my sent messages in it are now read.
+      setMessages((prev) => prev.map((m) => (m.senderId === user?.id ? { ...m, isRead: true } : m)));
+    };
+
     socket.on('message:new', onNew);
-    return () => { socket.off('message:new', onNew); };
-  }, [token, id]);
+    socket.on('message:delivered', onDelivered);
+    socket.on('message:read', onRead);
+    return () => {
+      socket.off('message:new', onNew);
+      socket.off('message:delivered', onDelivered);
+      socket.off('message:read', onRead);
+    };
+  }, [token, id, user?.id, otherUser?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -103,10 +158,17 @@ export default function Conversation() {
     try {
       if (!mock) {
         const call = await api.initiateCall(otherUser.id, callType);
-        if (call?.meetLink) window.open(call.meetLink, '_blank', 'noopener');
+        callStore.startOutgoing({
+          callId: call.id,
+          otherName: otherUser.displayName,
+          otherAvatar: otherUser.avatarUrl,
+          callType,
+          meetLink: call.meetLink,
+        });
         return;
       }
-      // Mock path — fabricate a Meet link and open it
+      // Mock path (single-tab test mode) — fabricate a Meet link and dispatch
+      // a synthetic "incoming call" straight back at ourselves.
       const callId = `mock-${Date.now()}`;
       const meetLink = `https://meet.google.com/mock-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 6)}`;
       window.dispatchEvent(new CustomEvent('noalone:mock-incoming-call', {
@@ -169,15 +231,18 @@ export default function Conversation() {
       <div className="messages" ref={scrollRef} data-testid="messages">
         {err && <div className="err">{err}</div>}
         {messages.length === 0 && <div className="empty">No messages yet. Say hello.</div>}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`bubble ${m.senderId === user?.id ? 'mine' : ''}`}
-            data-testid="message"
-          >
-            {m.content}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const mine = m.senderId === user?.id;
+          return (
+            <div key={m.id} className={`bubble ${mine ? 'mine' : ''}`} data-testid="message">
+              <div>{m.content}</div>
+              <div className="bubble-meta">
+                <span data-testid="message-time">{formatTime(m.createdAt)}</span>
+                {mine && <Tick m={m} />}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <form className="composer" onSubmit={send}>

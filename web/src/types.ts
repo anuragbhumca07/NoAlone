@@ -34,6 +34,7 @@ export interface Message {
   mediaUrl?: string | null;
   type: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'SYSTEM';
   isRead: boolean;
+  deliveredAt?: string | null;
   createdAt: string;
   sender?: { id: string; displayName: string; avatarUrl?: string | null };
 }

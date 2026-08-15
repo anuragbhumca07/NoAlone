@@ -105,6 +105,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage('message:delivered')
+  async handleDelivered(@ConnectedSocket() client: Socket, @MessageBody() data: { messageId: string }) {
+    const result = await this.chatService.markDelivered(data.messageId, client.data.userId);
+    if (!result) return;
+    this.server.to(`user:${result.senderId}`).emit('message:delivered', {
+      messageId: data.messageId,
+      conversationId: result.conversationId,
+    });
+  }
+
   @SubscribeMessage('message:read')
   async handleRead(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string; targetUserId: string }) {
     await this.chatService.markAsRead(data.conversationId, client.data.userId);

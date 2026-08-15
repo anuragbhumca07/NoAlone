@@ -247,6 +247,50 @@ test('profile edit persists displayName + bio + age', async ({ page }) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// 6b. Change password — new password works, and old one no longer does
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('change password updates credentials; old password stops working', async ({ page }) => {
+  const NEW_PASSWORD = 'ChangedPw@2026!';
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  await page.getByTestId('nav-profile').click();
+  await expect(page.getByTestId('change-password-card')).toBeVisible();
+  await page.getByTestId('change-password-new').fill(NEW_PASSWORD);
+  await page.getByTestId('change-password-confirm').fill(NEW_PASSWORD);
+  await page.getByTestId('change-password-submit').click();
+  await expect(page.getByTestId('change-password-saved')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('sign-out').click();
+  await expect(page).toHaveURL(/\/login$/);
+
+  // Old password now rejected
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page.getByTestId('login-error')).toBeVisible({ timeout: 10_000 });
+
+  // New password logs in fine
+  await page.getByTestId('login-password').fill(NEW_PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  // Revert to the original password so every later test in this suite
+  // (which all log in with PASSWORD) keeps working.
+  await page.getByTestId('nav-profile').click();
+  await expect(page.getByTestId('change-password-card')).toBeVisible();
+  await page.getByTestId('change-password-new').fill(PASSWORD);
+  await page.getByTestId('change-password-confirm').fill(PASSWORD);
+  await page.getByTestId('change-password-submit').click();
+  await expect(page.getByTestId('change-password-saved')).toBeVisible({ timeout: 10_000 });
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // 7. Status toggle flips between Available and Away
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -311,6 +355,34 @@ test('send a message — optimistic bubble appears in thread', async ({ page }) 
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════════
+// 9b. Every message bubble is timestamped
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('sent message bubble shows a timestamp', async ({ page }) => {
+  test.skip(!state.conversationId, 'No conversation yet');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await page.goto(`/chats/${state.conversationId}`);
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  const stamp = `time-check-${Date.now()}`;
+  await page.getByTestId('composer-input').fill(stamp);
+  await page.getByTestId('composer-send').click();
+
+  const bubble = page.locator('[data-testid="message"]', { hasText: stamp });
+  await expect(bubble).toBeVisible({ timeout: 5_000 });
+  // formatTime() renders either "3:45 PM" (today) or "Aug 14, 3:45 PM" (older) —
+  // either way it must contain a recognizable clock time.
+  await expect(bubble.getByTestId('message-time')).toHaveText(/\d{1,2}:\d{2}\s?(AM|PM)?/i);
+  // Own messages carry a delivery tick (sent/delivered/read).
+  await expect(bubble.locator('.tick')).toBeVisible();
+});
+
 test('two real browser sessions — sender sees exactly one bubble, receiver gets it live', async ({ browser }) => {
   test.skip(!state.conversationId || !state.userBUsername, 'No conversation/user B yet');
 
@@ -359,6 +431,107 @@ test('two real browser sessions — sender sees exactly one bubble, receiver get
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// 9c. Delivery + read ticks — sent → delivered → read, live over sockets
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('message ticks progress from sent to delivered to read', async ({ browser }) => {
+  test.skip(!state.conversationId || !state.userBUsername, 'No conversation/user B yet');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  try {
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.goto(`/chats/${state.conversationId}`);
+    await expect(pageA.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+    const stamp = `tick-check-${Date.now()}`;
+    await pageA.getByTestId('composer-input').fill(stamp);
+    await pageA.getByTestId('composer-send').click();
+    const bubbleA = pageA.locator('[data-testid="message"]', { hasText: stamp });
+    await expect(bubbleA).toBeVisible({ timeout: 5_000 });
+
+    // Before B is even online, the tick is a plain "sent" single check.
+    await expect(bubbleA.locator('[data-testid="tick-sent"]')).toBeVisible({ timeout: 5_000 });
+
+    // B comes online and opens the same conversation — B's client acks
+    // delivery immediately (AppShell's global message:new handler), then acks
+    // read once the thread mounts (Conversation.tsx's on-open effect).
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageB.goto(`/chats/${state.conversationId}`);
+    await expect(pageB.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+    // A's bubble should flip straight to "read" (double tick) since B opened
+    // the thread — delivered and read both land, read wins the render.
+    await expect(bubbleA.locator('[data-testid="tick-read"]')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 9d. Unread badges — sidebar nav count + per-conversation count
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('unread badge appears on nav + conversation row until the thread is opened', async ({ browser }) => {
+  test.skip(!state.conversationId || !state.userBUsername, 'No conversation/user B yet');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  try {
+    // B logs in and sits on /chats (list view, not inside the thread) —
+    // this is the "unread while elsewhere in the app" scenario.
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await expect(pageB.getByTestId('chats-page')).toBeVisible();
+    await pageB.waitForTimeout(1000);
+
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.goto(`/chats/${state.conversationId}`);
+    await expect(pageA.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+    await pageA.waitForTimeout(500);
+
+    const stamp = `unread-check-${Date.now()}`;
+    await pageA.getByTestId('composer-input').fill(stamp);
+    await pageA.getByTestId('composer-send').click();
+
+    // B is on /chats — the sidebar nav badge and the conversation row badge
+    // both light up without a reload.
+    await expect(pageB.getByTestId('unread-badge')).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.getByTestId(`unread-${state.conversationId}`)).toBeVisible({ timeout: 5_000 });
+
+    // Opening the thread clears both.
+    await pageB.getByTestId(`conversation-${state.conversationId}`).click();
+    await expect(pageB.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.getByTestId('unread-badge')).toBeHidden({ timeout: 10_000 });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // 10. Call CTAs: Authorize Google + start mock voice call → incoming modal
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -396,8 +569,8 @@ test('initiate mock voice call surfaces the incoming-call modal', async ({ page,
   await expect(page.getByTestId('start-voice-call')).toBeVisible();
   await page.getByTestId('start-voice-call').click();
 
-  // Mock mode dispatches a synthetic incoming-call event — the modal appears
-  await expect(page.getByTestId('incoming-call-modal')).toBeVisible({ timeout: 5_000 });
+  // Mock mode dispatches a synthetic incoming-call event — the call panel appears
+  await expect(page.getByTestId('call-panel')).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('accept-call')).toBeVisible();
   await expect(page.getByTestId('decline-call')).toBeVisible();
 });
@@ -406,7 +579,7 @@ test('initiate mock voice call surfaces the incoming-call modal', async ({ page,
 // 11. Accept incoming call → Meet link opens (mock)
 // ════════════════════════════════════════════════════════════════════════════════
 
-test('accept mock incoming call opens a meet.google.com link', async ({ page }) => {
+test('accept mock incoming call opens a meet.google.com link and shows the connected panel', async ({ page }) => {
   test.skip(!state.conversationId, 'No conversation yet');
   test.skip(!mockMode, 'Bundle is in real-Google mode — Meet link generation is exercised manually after consent');
 
@@ -428,15 +601,21 @@ test('accept mock incoming call opens a meet.google.com link', async ({ page }) 
 
   await page.goto(`/chats/${state.conversationId}`);
   await page.getByTestId('start-video-call').click();
-  await expect(page.getByTestId('incoming-call-modal')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('call-panel')).toBeVisible({ timeout: 5_000 });
   await page.getByTestId('accept-call').click();
 
-  // Modal closes after accept
-  await expect(page.getByTestId('incoming-call-modal')).toBeHidden();
+  // Panel stays open, now showing the connected/in-progress state with a duration + end-call button
+  await expect(page.getByTestId('call-panel')).toBeVisible();
+  await expect(page.getByTestId('call-duration')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('call-end')).toBeVisible();
 
   // A Meet link should have been opened
   const opened: string[] = await page.evaluate(() => (window as any).__opened || []);
   expect(opened.some((u) => /meet\.google\.com/.test(u))).toBeTruthy();
+
+  // Ending the call clears the panel
+  await page.getByTestId('call-end').click();
+  await expect(page.getByTestId('call-panel')).toBeHidden();
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -456,10 +635,38 @@ test('decline mock incoming call closes the modal', async ({ page }) => {
   await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
 
   await page.getByTestId('start-voice-call').click();
-  await expect(page.getByTestId('incoming-call-modal')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('call-panel')).toBeVisible({ timeout: 5_000 });
 
   await page.getByTestId('decline-call').click();
-  await expect(page.getByTestId('incoming-call-modal')).toBeHidden();
+  await expect(page.getByTestId('call-panel')).toBeHidden();
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 12b. Outgoing call — ringing-out state has a Cancel button, no Accept/Decline
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('/calls page — calling a user shows an outgoing ringing panel with Cancel', async ({ page }) => {
+  test.skip(!state.userBId, 'No seeded user B');
+  test.skip(!mockMode, 'Bundle is in real-Google mode — outgoing-ring flow is exercised manually');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  await page.getByTestId('nav-calls').click();
+  await expect(page.getByTestId('calls-page')).toBeVisible();
+  await page.getByTestId('call-search').fill(state.userBUsername!);
+  await expect(page.getByTestId(`call-${state.userBId}-voice`)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId(`call-${state.userBId}-voice`).click();
+
+  await expect(page.getByTestId('call-panel')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('cancel-call')).toBeVisible();
+  await expect(page.getByTestId('accept-call')).toBeHidden();
+
+  await page.getByTestId('cancel-call').click();
+  await expect(page.getByTestId('call-panel')).toBeHidden();
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

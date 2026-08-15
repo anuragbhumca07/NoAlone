@@ -101,6 +101,7 @@ export const api = {
     }),
   getMessages: (conversationId: string) =>
     request<any[]>(`chat/conversations/${conversationId}/messages`),
+  getUnread: () => request<{ conversationId: string; count: number }[]>('chat/unread'),
 
   // ── Calls ──
   getCallAuthStatus: () => request<{ isAuthorized: boolean }>('calls/authorize-status'),

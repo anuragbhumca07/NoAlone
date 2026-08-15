@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useUnread } from '../chatStore';
 import type { Conversation, User } from '../types';
 
 export default function Chats() {
   const navigate = useNavigate();
+  const { unread } = useUnread();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<User[]>([]);
@@ -90,28 +92,32 @@ export default function Chats() {
           </div>
         )}
 
-        {convs.map((c) => (
-          <div
-            key={c.id}
-            className="list-item"
-            data-testid={`conversation-${c.id}`}
-            onClick={() => navigate(`/chats/${c.id}`)}
-          >
-            <div className="avatar">{c.otherUser?.displayName?.slice(0, 1).toUpperCase() || '?'}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{c.otherUser?.displayName || 'Unknown'}</div>
-              <div
-                style={{
-                  fontSize: 13, color: 'var(--text-dim)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}
-              >
-                {c.lastMessage?.content || 'Say hello.'}
+        {convs.map((c) => {
+          const count = unread[c.id] || 0;
+          return (
+            <div
+              key={c.id}
+              className="list-item"
+              data-testid={`conversation-${c.id}`}
+              onClick={() => navigate(`/chats/${c.id}`)}
+            >
+              <div className="avatar">{c.otherUser?.displayName?.slice(0, 1).toUpperCase() || '?'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: count > 0 ? 700 : 600 }}>{c.otherUser?.displayName || 'Unknown'}</div>
+                <div
+                  style={{
+                    fontSize: 13, color: count > 0 ? 'var(--text)' : 'var(--text-dim)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {c.lastMessage?.content || 'Say hello.'}
+                </div>
               </div>
+              {count > 0 && <span className="badge" data-testid={`unread-${c.id}`}>{count > 99 ? '99+' : count}</span>}
+              {c.otherUser?.isOnline ? <span className="chip online">● online</span> : null}
             </div>
-            {c.otherUser?.isOnline ? <span className="chip online">● online</span> : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

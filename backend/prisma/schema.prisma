@@ -132,6 +132,7 @@ model Message {
   type            MessageType @default(TEXT)
   isRead          Boolean     @default(false)
   readAt          DateTime?
+  deliveredAt     DateTime?
   deletedAt       DateTime?
   createdAt       DateTime    @default(now())
 

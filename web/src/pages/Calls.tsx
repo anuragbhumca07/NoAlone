@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { callStore } from '../callStore';
 import type { Call, User } from '../types';
 
 function relTime(iso: string) {
@@ -65,13 +66,20 @@ export default function Calls() {
     try {
       if (!mock) {
         const call = await api.initiateCall(user.id, type);
-        if (call?.meetLink) window.open(call.meetLink, '_blank', 'noopener');
+        callStore.startOutgoing({
+          callId: call.id,
+          otherName: user.displayName,
+          otherAvatar: user.avatarUrl,
+          callType: type,
+          meetLink: call.meetLink,
+        });
         refresh();
         return;
       }
       const meetLink = `https://meet.google.com/mock-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 6)}`;
+      const callId = `mock-${Date.now()}`;
       const mockCall: Call = {
-        id: `mock-${Date.now()}`,
+        id: callId,
         callerId: 'me',
         receiverId: user.id,
         meetLink,
@@ -82,7 +90,13 @@ export default function Calls() {
         otherUser: user,
       };
       setHistory((prev) => [mockCall, ...prev]);
-      window.open(meetLink, '_blank', 'noopener');
+      callStore.startOutgoing({
+        callId,
+        otherName: user.displayName,
+        otherAvatar: user.avatarUrl,
+        callType: type,
+        meetLink,
+      });
     } catch (e: any) {
       alert(e?.message || 'Call failed');
     }
