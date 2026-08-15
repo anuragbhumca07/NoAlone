@@ -518,3 +518,33 @@ test('Continue with Google redirects to Supabase authorize (or surfaces an error
     expect(url).toMatch(/supabase\.co\/auth\/v1\/authorize|accounts\.google\.com/i);
   }
 });
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 16. /oauth/google?state=calls routes to OUR backend, never to Supabase
+// ════════════════════════════════════════════════════════════════════════════════
+//
+// Regression guard: the Calendar-authorize flow (Calls.tsx / Conversation.tsx
+// "Authorize Google" buttons) redirects straight to Google and back to
+// /oauth/google?code=...&state=calls — this must be exchanged via our own
+// POST /calls/authorize, never handed to Supabase's exchangeCodeForSession
+// (which is only for the sign-in flow). A prior refactor of OAuthCallback.tsx
+// accidentally dropped the state=calls branch, silently misrouting every
+// Calendar-authorize code into the sign-in exchange instead.
+
+test('oauth callback with state=calls calls our backend, not Supabase', async ({ page }) => {
+  const calledUrls: string[] = [];
+  await page.route('**/*', async (route) => {
+    calledUrls.push(route.request().url());
+    await route.continue();
+  });
+
+  await page.goto('/oauth/google?code=fake-test-code-not-real&state=calls');
+  await expect(page.getByTestId('oauth-callback')).toBeVisible();
+  await page.waitForTimeout(1500);
+
+  const hitOurBackend = calledUrls.some((u) => u.includes('/calls/authorize'));
+  const hitSupabaseTokenExchange = calledUrls.some((u) => /supabase\.co\/auth\/v1\/token/.test(u));
+
+  expect(hitOurBackend, 'expected a request to our backend /calls/authorize').toBe(true);
+  expect(hitSupabaseTokenExchange, 'must NOT hand the Calendar auth code to Supabase').toBe(false);
+});
