@@ -111,7 +111,7 @@ export const api = {
       body: JSON.stringify({ code, redirectUri }),
     }),
   initiateCall: (receiverId: string, callType: 'VOICE' | 'VIDEO') =>
-    request<any>('calls/initiate', {
+    request<{ call: { id: string; [k: string]: any }; meetLink: string }>('calls/initiate', {
       method: 'POST',
       body: JSON.stringify({ receiverId, callType }),
     }),

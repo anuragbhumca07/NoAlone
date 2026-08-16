@@ -65,13 +65,13 @@ export default function Calls() {
     const mock = import.meta.env.VITE_MOCK_CALLS === 'true';
     try {
       if (!mock) {
-        const call = await api.initiateCall(user.id, type);
+        const res = await api.initiateCall(user.id, type);
         callStore.startOutgoing({
-          callId: call.id,
+          callId: res.call.id,
           otherName: user.displayName,
           otherAvatar: user.avatarUrl,
           callType: type,
-          meetLink: call.meetLink,
+          meetLink: res.meetLink,
         });
         refresh();
         return;

@@ -160,13 +160,13 @@ export default function Conversation() {
     }
     try {
       if (!mock) {
-        const call = await api.initiateCall(otherUser.id, callType);
+        const res = await api.initiateCall(otherUser.id, callType);
         callStore.startOutgoing({
-          callId: call.id,
+          callId: res.call.id,
           otherName: otherUser.displayName,
           otherAvatar: otherUser.avatarUrl,
           callType,
-          meetLink: call.meetLink,
+          meetLink: res.meetLink,
         });
         return;
       }
