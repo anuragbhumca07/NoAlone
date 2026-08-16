@@ -12,8 +12,8 @@ export class ChatService {
     let conversation = await this.prisma.conversation.findUnique({
       where: { user1Id_user2Id: { user1Id, user2Id } },
       include: {
-        user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
-        user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
+        user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
+        user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
       },
     });
 
@@ -21,8 +21,8 @@ export class ChatService {
       conversation = await this.prisma.conversation.create({
         data: { user1Id, user2Id },
         include: {
-          user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
-          user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
+          user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
+          user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
         },
       });
     }
@@ -36,8 +36,8 @@ export class ChatService {
         OR: [{ user1Id: userId }, { user2Id: userId }],
       },
       include: {
-        user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
-        user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } },
+        user1: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
+        user2: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,

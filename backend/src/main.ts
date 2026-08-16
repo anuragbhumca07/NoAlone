@@ -6,6 +6,17 @@ import helmet from 'helmet';
 import * as compression from 'compression';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 
+// A single uncaught rejection (e.g. a transient DB hiccup inside a detached
+// setTimeout/socket callback, outside any request's try/catch) would
+// otherwise take the entire process down. Log and keep serving everyone
+// else instead — this has already caught real crashes in socket handlers.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (process kept alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (process kept alive):', err);
+});
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 

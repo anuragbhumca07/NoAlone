@@ -5,6 +5,7 @@ import { useAuth } from '../store';
 import { getSocket } from '../socket';
 import { chatStore } from '../chatStore';
 import { callStore } from '../callStore';
+import UserAvatar from '../components/UserAvatar';
 import type { Message } from '../types';
 
 function formatTime(iso: string): string {
@@ -229,7 +230,7 @@ export default function Conversation() {
       <div className="thread-header">
         <div className="row">
           <button className="ghost" onClick={() => navigate('/chats')} data-testid="back-to-chats">←</button>
-          <div className="avatar">{otherUser?.displayName?.slice(0, 1).toUpperCase() || '?'}</div>
+          <UserAvatar name={otherUser?.displayName} avatarConfig={otherUser?.avatarConfig} />
           <div>
             <div style={{ fontWeight: 600 }}>{otherUser?.displayName || 'Conversation'}</div>
             <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>

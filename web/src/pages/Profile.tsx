@@ -3,6 +3,9 @@ import { api } from '../api';
 import { auth, useAuth } from '../store';
 import { supabase } from '../supabaseClient';
 import { RINGTONE_NAMES, getRingtonePreference, setRingtonePreference, startRingtone, type RingtoneName } from '../sounds';
+import AvatarBuilder from '../components/AvatarBuilder';
+import UserAvatar from '../components/UserAvatar';
+import { defaultAvatar, type AvatarConfig } from '../avatar';
 
 const GENDERS = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] as const;
 
@@ -22,6 +25,9 @@ export default function Profile() {
   const [err, setErr] = useState<string | null>(null);
 
   const [ringtone, setRingtone] = useState<RingtoneName>(getRingtonePreference());
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(defaultAvatar());
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
@@ -43,6 +49,7 @@ export default function Profile() {
           language: me.language || 'en',
           interests: (me.interests || []).join(', '),
         });
+        if (me.avatarConfig) setAvatarConfig(me.avatarConfig);
         auth.setUser({ ...(user || {}), ...me } as any);
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Could not load profile');
@@ -102,6 +109,18 @@ export default function Profile() {
     } finally { setPwBusy(false); }
   };
 
+  const saveAvatar = async () => {
+    setAvatarBusy(true);
+    setAvatarMsg(null);
+    try {
+      const updated = await api.updateMe({ avatarConfig });
+      auth.setUser({ ...(user || {}), ...updated } as any);
+      setAvatarMsg('Avatar saved.');
+    } catch (e: any) {
+      setAvatarMsg(e?.message || 'Could not save avatar');
+    } finally { setAvatarBusy(false); }
+  };
+
   const changeRingtone = (name: RingtoneName) => {
     setRingtone(name);
     setRingtonePreference(name);
@@ -114,7 +133,7 @@ export default function Profile() {
 
       <form onSubmit={save} className="card" style={{ maxWidth: 640 }}>
         <div className="row" style={{ marginBottom: 16 }}>
-          <div className="avatar lg">{(form.displayName || '?').slice(0, 1).toUpperCase()}</div>
+          <UserAvatar name={form.displayName} avatarConfig={avatarConfig} size="lg" />
           <div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>{form.displayName || 'Unnamed'}</div>
             <div style={{ color: 'var(--text-dim)' }}>@{form.username || ''}</div>
@@ -195,6 +214,18 @@ export default function Profile() {
           {busy ? 'Saving…' : 'Save changes'}
         </button>
       </form>
+
+      <div className="card" style={{ maxWidth: 640, marginTop: 24 }} data-testid="avatar-card">
+        <h3 style={{ marginTop: 0 }}>Customize your avatar</h3>
+        <p style={{ color: 'var(--text-dim)', marginTop: 0, fontSize: 13 }}>
+          Shown across chats and calls instead of your initial.
+        </p>
+        <AvatarBuilder config={avatarConfig} onChange={setAvatarConfig} />
+        {avatarMsg && <div className="ok" data-testid="avatar-saved">{avatarMsg}</div>}
+        <button onClick={saveAvatar} disabled={avatarBusy} style={{ marginTop: 16 }} data-testid="avatar-save">
+          {avatarBusy ? 'Saving…' : 'Save avatar'}
+        </button>
+      </div>
 
       <form onSubmit={changePassword} className="card" style={{ maxWidth: 640, marginTop: 24 }} data-testid="change-password-card">
         <h3 style={{ marginTop: 0 }}>Change password</h3>

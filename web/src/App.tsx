@@ -10,6 +10,7 @@ import Chats from './pages/Chats';
 import Conversation from './pages/Conversation';
 import Calls from './pages/Calls';
 import RandomChat from './pages/RandomChat';
+import AiBuddy from './pages/AiBuddy';
 import OAuthCallback from './pages/OAuthCallback';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/chats/:id" element={<Conversation />} />
         <Route path="/calls" element={<Calls />} />
         <Route path="/random" element={<RandomChat />} />
+        <Route path="/ai-buddy" element={<AiBuddy />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
 

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsEnum, IsArray, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsEnum, IsArray, IsObject, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum GenderEnum {
@@ -44,4 +44,9 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   interests?: string[];
+
+  @ApiProperty({ required: false, description: 'Customizable avatar config (skin tone, hair, outfit, etc)' })
+  @IsOptional()
+  @IsObject()
+  avatarConfig?: Record<string, any>;
 }

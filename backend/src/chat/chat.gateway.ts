@@ -57,11 +57,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(client: Socket) {
-    if (client.data.userId) {
+    if (!client.data.userId) return;
+    try {
       await this.redis.setUserOffline(client.data.userId);
       await this.usersService.setOnlineStatus(client.data.userId, false);
       this.server.emit('user:offline', { userId: client.data.userId });
       this.logger.log(`User ${client.data.userId} disconnected`);
+    } catch (e) {
+      this.logger.warn(`handleDisconnect failed for ${client.data.userId}: ${e.message}`);
     }
   }
 

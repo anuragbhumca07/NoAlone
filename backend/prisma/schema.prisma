@@ -58,64 +58,96 @@ enum CallType {
 }
 
 model User {
-  id              String    @id @default(uuid())
-  supabaseId      String?   @unique
-  phone           String?   @unique
-  email           String?   @unique
-  googleId        String?   @unique
-  username        String    @unique
-  displayName     String
-  bio             String?
-  avatarUrl       String?
-  age             Int?
-  gender          Gender?
-  language        String    @default("en")
-  interests       String[]
-  passwordHash              String?
-  emailVerified             Boolean   @default(false)
-  emailVerificationCode     String?
-  emailVerificationExpiry   DateTime?
+  id                      String    @id @default(uuid())
+  supabaseId              String?   @unique
+  phone                   String?   @unique
+  email                   String?   @unique
+  googleId                String?   @unique
+  username                String    @unique
+  displayName             String
+  bio                     String?
+  avatarUrl               String?
+  age                     Int?
+  gender                  Gender?
+  language                String    @default("en")
+  interests               String[]
+  passwordHash            String?
+  emailVerified           Boolean   @default(false)
+  emailVerificationCode   String?
+  emailVerificationExpiry DateTime?
   // Google Calendar / Meet OAuth tokens (encrypted at rest)
-  googleAccessToken         String?
-  googleRefreshToken        String?
-  googleTokenExpiry         DateTime?
-  isGoogleAuthorized        Boolean   @default(false)
-  isOnline        Boolean   @default(false)
-  lastSeen        DateTime  @default(now())
-  isVerified      Boolean   @default(false)
-  isBanned        Boolean   @default(false)
-  fcmToken        String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  googleAccessToken       String?
+  googleRefreshToken      String?
+  googleTokenExpiry       DateTime?
+  isGoogleAuthorized      Boolean   @default(false)
+  isOnline                Boolean   @default(false)
+  lastSeen                DateTime  @default(now())
+  isVerified              Boolean   @default(false)
+  isBanned                Boolean   @default(false)
+  fcmToken                String?
+  avatarConfig            Json?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Relations
-  sentMessages      Message[]       @relation("SentMessages")
-  conversations1    Conversation[]  @relation("ConversationUser1")
-  conversations2    Conversation[]  @relation("ConversationUser2")
-  roomMembers       RoomMember[]
-  reportsMade       Report[]        @relation("ReporterUser")
-  reportsReceived   Report[]        @relation("ReportedUser")
-  blockedUsers      Block[]         @relation("BlockerUser")
-  blockedByUsers    Block[]         @relation("BlockedUser")
-  matchRequests     Match[]         @relation("MatchRequester")
-  matchReceived     Match[]         @relation("MatchReceiver")
-  callsMade         Call[]          @relation("CallerCalls")
-  callsReceived     Call[]          @relation("ReceiverCalls")
+  sentMessages    Message[]      @relation("SentMessages")
+  conversations1  Conversation[] @relation("ConversationUser1")
+  conversations2  Conversation[] @relation("ConversationUser2")
+  roomMembers     RoomMember[]
+  reportsMade     Report[]       @relation("ReporterUser")
+  reportsReceived Report[]       @relation("ReportedUser")
+  blockedUsers    Block[]        @relation("BlockerUser")
+  blockedByUsers  Block[]        @relation("BlockedUser")
+  matchRequests   Match[]        @relation("MatchRequester")
+  matchReceived   Match[]        @relation("MatchReceiver")
+  callsMade       Call[]         @relation("CallerCalls")
+  callsReceived   Call[]         @relation("ReceiverCalls")
+  aiCompanion     AiCompanion?
 
   @@index([isOnline])
   @@index([language])
 }
 
+enum AiChatRole {
+  USER
+  AI
+}
+
+model AiCompanion {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  name      String   @default("Alex")
+  gender    Gender   @default(OTHER)
+  outfit    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiChatMessage[]
+}
+
+model AiChatMessage {
+  id          String     @id @default(uuid())
+  companionId String
+  role        AiChatRole
+  content     String
+  createdAt   DateTime   @default(now())
+
+  companion AiCompanion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, createdAt])
+}
+
 model Conversation {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   user1Id   String
   user2Id   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user1     User      @relation("ConversationUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2     User      @relation("ConversationUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  messages  Message[]
+  user1    User      @relation("ConversationUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2    User      @relation("ConversationUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages Message[]
 
   @@unique([user1Id, user2Id])
   @@index([user1Id])
@@ -123,22 +155,22 @@ model Conversation {
 }
 
 model Message {
-  id              String      @id @default(uuid())
-  conversationId  String?
-  roomId          String?
-  senderId        String
-  content         String?
-  mediaUrl        String?
-  type            MessageType @default(TEXT)
-  isRead          Boolean     @default(false)
-  readAt          DateTime?
-  deliveredAt     DateTime?
-  deletedAt       DateTime?
-  createdAt       DateTime    @default(now())
+  id             String      @id @default(uuid())
+  conversationId String?
+  roomId         String?
+  senderId       String
+  content        String?
+  mediaUrl       String?
+  type           MessageType @default(TEXT)
+  isRead         Boolean     @default(false)
+  readAt         DateTime?
+  deliveredAt    DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime    @default(now())
 
-  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  room            Room?         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  sender          User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  room         Room?         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender       User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
   @@index([roomId])
@@ -147,21 +179,21 @@ model Message {
 }
 
 model Room {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   description String?
   coverUrl    String?
-  type        RoomType  @default(PUBLIC)
+  type        RoomType @default(PUBLIC)
   topic       String?
-  language    String    @default("en")
-  maxMembers  Int       @default(50)
-  isLive      Boolean   @default(false)
+  language    String   @default("en")
+  maxMembers  Int      @default(50)
+  isLive      Boolean  @default(false)
   createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  members     RoomMember[]
-  messages    Message[]
+  members  RoomMember[]
+  messages Message[]
 
   @@index([isLive])
   @@index([language])
@@ -169,15 +201,15 @@ model Room {
 }
 
 model RoomMember {
-  id        String   @id @default(uuid())
-  roomId    String
-  userId    String
-  role      String   @default("member") // owner, moderator, member
-  joinedAt  DateTime @default(now())
-  isMuted   Boolean  @default(false)
+  id       String   @id @default(uuid())
+  roomId   String
+  userId   String
+  role     String   @default("member") // owner, moderator, member
+  joinedAt DateTime @default(now())
+  isMuted  Boolean  @default(false)
 
-  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, userId])
 }
@@ -190,8 +222,8 @@ model Match {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  requester   User     @relation("MatchRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  receiver    User     @relation("MatchReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  requester User @relation("MatchRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("MatchReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([requesterId])
   @@index([receiverId])
@@ -208,8 +240,8 @@ model Report {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  reporter    User         @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
-  reported    User         @relation("ReportedUser", fields: [reportedId], references: [id], onDelete: Cascade)
+  reporter User @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportedUser", fields: [reportedId], references: [id], onDelete: Cascade)
 
   @@index([reportedId])
   @@index([status])
@@ -221,27 +253,27 @@ model Block {
   blockedId String
   createdAt DateTime @default(now())
 
-  blocker   User     @relation("BlockerUser", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker User @relation("BlockerUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
 }
 
 model Call {
-  id          String     @id @default(uuid())
-  callerId    String
-  receiverId  String
-  meetLink    String?
-  meetCode    String?
-  status      CallStatus @default(RINGING)
-  callType    CallType   @default(VOICE)
-  createdAt   DateTime   @default(now())
-  answeredAt  DateTime?
-  endedAt     DateTime?
-  expiresAt   DateTime?
+  id         String     @id @default(uuid())
+  callerId   String
+  receiverId String
+  meetLink   String?
+  meetCode   String?
+  status     CallStatus @default(RINGING)
+  callType   CallType   @default(VOICE)
+  createdAt  DateTime   @default(now())
+  answeredAt DateTime?
+  endedAt    DateTime?
+  expiresAt  DateTime?
 
-  caller      User       @relation("CallerCalls", fields: [callerId], references: [id], onDelete: Cascade)
-  receiver    User       @relation("ReceiverCalls", fields: [receiverId], references: [id], onDelete: Cascade)
+  caller   User @relation("CallerCalls", fields: [callerId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceiverCalls", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([callerId])
   @@index([receiverId])

@@ -13,6 +13,7 @@ export interface User {
   isOnline?: boolean;
   isVerified?: boolean;
   lastSeen?: string;
+  avatarConfig?: import('./avatar').AvatarConfig | null;
 }
 
 export interface Conversation {

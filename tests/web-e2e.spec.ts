@@ -211,12 +211,42 @@ test('sidebar navigation hits Chats / Calls / Profile', async ({ page }) => {
   await expect(page).toHaveURL(/\/random$/);
   await expect(page.getByTestId('random-chat-page')).toBeVisible();
 
+  await page.getByTestId('nav-ai-buddy').click();
+  await expect(page).toHaveURL(/\/ai-buddy$/);
+  await expect(page.getByTestId('ai-buddy-page')).toBeVisible();
+
   await page.getByTestId('nav-profile').click();
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByTestId('profile-page')).toBeVisible();
 
   await page.getByTestId('nav-chats').click();
   await expect(page).toHaveURL(/\/chats$/);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 5a. Dark mode toggle — persists across reload
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('theme toggle switches light/dark and persists on reload', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/);
+
+  const html = page.locator('html');
+  // Default is dark (no data-theme attribute).
+  await expect(html).not.toHaveAttribute('data-theme', 'light');
+
+  await page.getByTestId('theme-toggle').click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+
+  // Toggle back so later tests see the default dark palette.
+  await page.getByTestId('theme-toggle').click();
+  await expect(html).not.toHaveAttribute('data-theme', 'light');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -274,6 +304,38 @@ test('profile edit persists displayName + bio + age', async ({ page }) => {
   await expect(page.getByTestId('profile-display-name')).toHaveValue('Web Tester A');
   await expect(page.getByTestId('profile-bio')).toHaveValue('I run end-to-end tests.');
   await expect(page.getByTestId('profile-age')).toHaveValue('25');
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 6a. Avatar builder — customize and persist across reload
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('avatar builder customizes and persists the avatar', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/);
+
+  await page.getByTestId('nav-profile').click();
+  await expect(page.getByTestId('avatar-card')).toBeVisible();
+
+  await page.getByTestId('avatar-gender-BOY').click();
+  await page.getByTestId('avatar-hair-style-curly').click();
+  await page.getByTestId('avatar-outfit-style-hoodie').click();
+  await page.getByTestId('avatar-accessory-glasses').click();
+
+  // The live preview should now render an SVG instead of the letter fallback.
+  await expect(page.locator('[data-testid="avatar-preview"] svg')).toBeVisible();
+
+  await page.getByTestId('avatar-save').click();
+  await expect(page.getByTestId('avatar-saved')).toBeVisible({ timeout: 10_000 });
+
+  // Reload — the customized avatar (not the letter fallback) shows in the sidebar.
+  await page.reload();
+  await expect(page.getByTestId('avatar-card')).toBeVisible();
+  await expect(page.locator('[data-testid="avatar-preview"] svg')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar"] .avatar svg')).toBeVisible();
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -893,4 +955,45 @@ test('blocking a user removes them from search results', async ({ page, playwrig
   await page.getByTestId('user-search').fill(userD.username);
   await page.waitForTimeout(500);
   await expect(page.getByTestId(`user-result-${userD.id}`)).toBeHidden();
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 18. AI Buddy — customize (name, gender, outfit) and chat with instant replies
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('AI buddy can be customized and chatted with', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  await page.getByTestId('nav-ai-buddy').click();
+  await expect(page.getByTestId('ai-buddy-page')).toBeVisible();
+
+  // First-time visit with no history opens straight into customization.
+  await expect(page.getByTestId('ai-customize-panel')).toBeVisible();
+  await page.getByTestId('ai-name-input').fill('Robo');
+  await page.getByTestId('avatar-gender-GIRL').click();
+  await page.getByTestId('avatar-outfit-style-dress').click();
+  await page.getByTestId('ai-save').click();
+  await expect(page.getByTestId('ai-save-message')).toBeVisible({ timeout: 10_000 });
+
+  // Saving returns to the chat view, now addressed by the new name.
+  await expect(page.getByTestId('ai-chat')).toBeVisible();
+  await expect(page.getByTestId('ai-composer-input')).toHaveAttribute('placeholder', /Robo/);
+
+  const stamp = `hello-ai-${Date.now()}`;
+  await page.getByTestId('ai-composer-input').fill(stamp);
+  await page.getByTestId('ai-composer-send').click();
+
+  await expect(page.locator('[data-testid="ai-message"]', { hasText: stamp })).toBeVisible({ timeout: 5_000 });
+  // A reply follows — there should be at least 2 message bubbles (mine + AI's).
+  await expect(page.locator('[data-testid="ai-message"]')).toHaveCount(2, { timeout: 5_000 });
+
+  // Customization survives reload.
+  await page.reload();
+  await expect(page.getByTestId('ai-buddy-page')).toBeVisible();
+  await expect(page.locator('.ai-hero .avatar svg')).toBeVisible();
+  await expect(page.locator('[data-testid="ai-message"]')).toHaveCount(2, { timeout: 10_000 });
 });

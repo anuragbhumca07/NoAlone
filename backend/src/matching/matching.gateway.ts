@@ -2,7 +2,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
-  OnGatewayConnection,
+  OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
@@ -12,7 +12,7 @@ import { MatchingService } from './matching.service';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/matching' })
-export class MatchingGateway {
+export class MatchingGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -29,6 +29,7 @@ export class MatchingGateway {
     try {
       const payload = this.jwtService.verify(token);
       const userId = payload.sub;
+      client.data.userId = userId;
 
       await this.matchingService.joinPool(userId, data);
 
@@ -37,20 +38,34 @@ export class MatchingGateway {
       const maxAttempts = 30;
 
       const poll = async () => {
-        if (attempts >= maxAttempts) {
-          client.emit('match:timeout', { message: 'No match found, try again' });
-          await this.matchingService.leavePool(userId);
+        // The client disconnected (tab closed, navigated away, or a prior
+        // failed attempt got torn down) — stop polling and vacate the pool
+        // instead of running for up to a minute against a dead socket and
+        // potentially stealing a match meant for someone still searching.
+        if (client.disconnected) {
+          await this.matchingService.leavePool(userId).catch(() => {});
           return;
         }
 
-        const result = await this.matchingService.findMatch(userId);
-        if (result.matched) {
-          client.emit('match:found', result);
-          // Also notify the matched user
-          this.server.emit(`match:found:${result.user.id}`, result);
-        } else {
-          attempts++;
-          setTimeout(poll, 2000);
+        try {
+          if (attempts >= maxAttempts) {
+            client.emit('match:timeout', { message: 'No match found, try again' });
+            await this.matchingService.leavePool(userId);
+            return;
+          }
+
+          const result = await this.matchingService.findMatch(userId);
+          if (result.matched) {
+            client.emit('match:found', result);
+            // Also notify the matched user
+            this.server.emit(`match:found:${result.user.id}`, result);
+          } else {
+            attempts++;
+            setTimeout(poll, 2000);
+          }
+        } catch (e) {
+          this.logger.warn(`match poll failed for ${userId}: ${e.message}`);
+          client.emit('match:error', { message: 'Matching failed, please try again' });
         }
       };
 
@@ -69,5 +84,18 @@ export class MatchingGateway {
       await this.matchingService.leavePool(payload.sub);
       client.emit('match:cancelled', {});
     } catch (e) {}
+  }
+
+  // Disconnecting mid-search (closed tab, navigated away, lost connection)
+  // must vacate the pool immediately — otherwise a still-running poll loop
+  // can match a live searcher against a socket that's no longer there to
+  // receive the result, silently swallowing their turn.
+  async handleDisconnect(client: Socket) {
+    if (!client.data.userId) return;
+    try {
+      await this.matchingService.leavePool(client.data.userId);
+    } catch (e) {
+      this.logger.warn(`cleanup on disconnect failed for ${client.data.userId}: ${e.message}`);
+    }
   }
 }

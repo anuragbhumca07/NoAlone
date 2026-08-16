@@ -9,6 +9,8 @@ import { callStore, useActiveCall } from '../callStore';
 import { startRingtone, playMessagePing } from '../sounds';
 import StatusToggle from './StatusToggle';
 import CallPanel from './CallPanel';
+import ThemeToggle from './ThemeToggle';
+import UserAvatar from './UserAvatar';
 import type { IncomingCallPayload, Message } from '../types';
 
 export default function AppShell() {
@@ -125,7 +127,10 @@ export default function AppShell() {
   return (
     <div className="layout">
       <aside className="sidebar" data-testid="sidebar">
-        <div className="brand">noAlone</div>
+        <div className="spread" style={{ marginBottom: 8 }}>
+          <div className="brand">noAlone</div>
+          <ThemeToggle />
+        </div>
 
         <NavLink to="/chats" data-testid="nav-chats">
           💬 Chats
@@ -135,6 +140,7 @@ export default function AppShell() {
         </NavLink>
         <NavLink to="/calls" data-testid="nav-calls">📞 Calls</NavLink>
         <NavLink to="/random" data-testid="nav-random">🎲 Meet someone</NavLink>
+        <NavLink to="/ai-buddy" data-testid="nav-ai-buddy">🤖 AI Buddy</NavLink>
         <NavLink to="/profile" data-testid="nav-profile">👤 Profile</NavLink>
 
         <div style={{ flex: 1 }} />
@@ -142,7 +148,7 @@ export default function AppShell() {
         <StatusToggle />
 
         <div className="row" style={{ marginTop: 12, padding: '0 4px' }}>
-          <div className="avatar">{(user?.displayName || '?').slice(0, 1).toUpperCase()}</div>
+          <UserAvatar name={user?.displayName} avatarConfig={user?.avatarConfig} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.displayName || 'You'}

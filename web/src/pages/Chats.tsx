@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useUnread } from '../chatStore';
+import UserAvatar from '../components/UserAvatar';
 import type { Conversation, User } from '../types';
 
 export default function Chats() {
@@ -72,7 +73,7 @@ export default function Chats() {
               data-testid={`user-result-${u.id}`}
               onClick={() => openChatWith(u.id)}
             >
-              <div className="avatar">{u.displayName?.slice(0, 1).toUpperCase()}</div>
+              <UserAvatar name={u.displayName} avatarConfig={u.avatarConfig} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{u.displayName}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>@{u.username}</div>
@@ -101,7 +102,7 @@ export default function Chats() {
               data-testid={`conversation-${c.id}`}
               onClick={() => navigate(`/chats/${c.id}`)}
             >
-              <div className="avatar">{c.otherUser?.displayName?.slice(0, 1).toUpperCase() || '?'}</div>
+              <UserAvatar name={c.otherUser?.displayName} avatarConfig={c.otherUser?.avatarConfig} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: count > 0 ? 700 : 600 }}>{c.otherUser?.displayName || 'Unknown'}</div>
                 <div

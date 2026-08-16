@@ -27,6 +27,7 @@ export class UsersService {
         lastSeen: true,
         isVerified: true,
         createdAt: true,
+        avatarConfig: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -61,6 +62,7 @@ export class UsersService {
         language: true,
         interests: true,
         isVerified: true,
+        avatarConfig: true,
       },
     });
   }
@@ -93,6 +95,7 @@ export class UsersService {
         avatarUrl: true,
         isOnline: true,
         isVerified: true,
+        avatarConfig: true,
       },
       take: 20,
     });

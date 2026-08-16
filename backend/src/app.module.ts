@@ -12,6 +12,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { CallsModule } from './calls/calls.module';
+import { AiCompanionModule } from './ai-companion/ai-companion.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CallsModule } from './calls/calls.module';
     NotificationsModule,
     ModerationModule,
     CallsModule,
+    AiCompanionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -139,6 +139,18 @@ export const api = {
 
   // ── Random matching ──
   matchHistory: () => request<any[]>('matching/history'),
+
+  // ── AI companion ──
+  getAiCompanion: () => request<any>('ai-companion/me'),
+  updateAiCompanion: (patch: { name?: string; gender?: string; outfit?: object }) =>
+    request<any>('ai-companion/me', { method: 'PUT', body: JSON.stringify(patch) }),
+  getAiMessages: () => request<any[]>('ai-companion/messages'),
+  sendAiMessage: (content: string) =>
+    request<{ userMessage: any; aiMessage: any }>('ai-companion/messages', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  clearAiMessages: () => request<{ success: boolean }>('ai-companion/messages', { method: 'DELETE' }),
 };
 
 export { API_URL };

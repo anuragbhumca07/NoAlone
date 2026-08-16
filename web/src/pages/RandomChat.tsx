@@ -95,8 +95,17 @@ export default function RandomChat() {
             </div>
 
             {phase === 'timeout' && (
-              <div className="err" data-testid="random-timeout" style={{ marginBottom: 12 }}>
-                No one available right now — try again in a moment.
+              <div className="ai-nudge" data-testid="random-timeout">
+                <span style={{ fontSize: 28 }}>🤖</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>No one's free right now</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                    Chat with your AI buddy while you wait, or try matching again in a bit.
+                  </div>
+                </div>
+                <button onClick={() => navigate('/ai-buddy')} data-testid="random-chat-ai-cta">
+                  Chat with AI
+                </button>
               </div>
             )}
             {phase === 'error' && (
