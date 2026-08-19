@@ -139,6 +139,7 @@ export default function AppShell() {
           )}
         </NavLink>
         <NavLink to="/calls" data-testid="nav-calls">📞 Calls</NavLink>
+        <NavLink to="/rooms" data-testid="nav-rooms">🏛️ Rooms</NavLink>
         <NavLink to="/random" data-testid="nav-random">🎲 Meet someone</NavLink>
         <NavLink to="/ai-buddy" data-testid="nav-ai-buddy">🤖 AI Buddy</NavLink>
         <NavLink to="/profile" data-testid="nav-profile">👤 Profile</NavLink>

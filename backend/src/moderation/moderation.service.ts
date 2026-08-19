@@ -57,7 +57,7 @@ export class ModerationService {
     const blocks = await this.prisma.block.findMany({
       where: { blockerId: userId },
       include: {
-        blocked: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+        blocked: { select: { id: true, username: true, displayName: true, avatarUrl: true, avatarConfig: true } },
       },
     });
     return blocks.map((b) => b.blocked);

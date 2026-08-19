@@ -207,6 +207,10 @@ test('sidebar navigation hits Chats / Calls / Profile', async ({ page }) => {
   await expect(page).toHaveURL(/\/calls$/);
   await expect(page.getByTestId('calls-page')).toBeVisible();
 
+  await page.getByTestId('nav-rooms').click();
+  await expect(page).toHaveURL(/\/rooms$/);
+  await expect(page.getByTestId('rooms-page')).toBeVisible();
+
   await page.getByTestId('nav-random').click();
   await expect(page).toHaveURL(/\/random$/);
   await expect(page.getByTestId('random-chat-page')).toBeVisible();
@@ -573,6 +577,49 @@ test('message ticks progress from sent to delivered to read', async ({ browser }
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// 9c2. Typing indicator — live over sockets, no reload
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('typing indicator shows for the other user while they type', async ({ browser }) => {
+  test.skip(!state.conversationId || !state.userBUsername, 'No conversation/user B yet');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  try {
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.goto(`/chats/${state.conversationId}`);
+    await expect(pageA.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageB.goto(`/chats/${state.conversationId}`);
+    await expect(pageB.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+    await pageA.waitForTimeout(500);
+    await pageB.waitForTimeout(500);
+
+    await expect(pageA.getByTestId('typing-indicator')).toBeHidden();
+    await pageB.getByTestId('composer-input').pressSequentially('hey there', { delay: 30 });
+
+    await expect(pageA.getByTestId('typing-indicator')).toBeVisible({ timeout: 5_000 });
+    // Expires on its own a few seconds after pings stop.
+    await expect(pageA.getByTestId('typing-indicator')).toBeHidden({ timeout: 6_000 });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // 9d. Unread badges — sidebar nav count + per-conversation count
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -664,6 +711,67 @@ test('random match pairs two searching users into a shared conversation', async 
     const convIdA = pageA.url().split('/').pop();
     const convIdB = pageB.url().split('/').pop();
     expect(convIdA).toBe(convIdB);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 9e2. Rooms — create, join from a second user, chat live, leave
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('a room can be created, joined, and chatted in live by two users', async ({ browser }) => {
+  test.skip(!state.userBId || !state.userBUsername, 'No seeded user B');
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+  const roomName = `Test Room ${Date.now()}`;
+
+  try {
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+    await pageA.goto('/rooms');
+    await expect(pageA.getByTestId('rooms-page')).toBeVisible();
+    await pageA.getByTestId('rooms-create-toggle').click();
+    await pageA.getByTestId('rooms-create-name').fill(roomName);
+    await pageA.getByTestId('rooms-create-submit').click();
+    await expect(pageA.getByTestId('room-chat-page')).toBeVisible({ timeout: 10_000 });
+    const roomId = pageA.url().split('/').pop();
+
+    await pageB.goto('/login');
+    await pageB.getByTestId('login-email').fill(USER_B_EMAIL);
+    await pageB.getByTestId('login-password').fill(PASSWORD);
+    await pageB.getByTestId('login-submit').click();
+    await expect(pageB).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+    await pageB.goto('/rooms');
+    await expect(pageB.getByTestId(`room-${roomId}`)).toBeVisible({ timeout: 10_000 });
+    await pageB.getByTestId(`room-${roomId}`).click();
+    await expect(pageB.getByTestId('room-chat-page')).toBeVisible({ timeout: 10_000 });
+    await pageA.waitForTimeout(500);
+    await pageB.waitForTimeout(500);
+
+    const stamp = `room-hello-${Date.now()}`;
+    await pageB.getByTestId('room-composer-input').fill(stamp);
+    await pageB.getByTestId('room-composer-send').click();
+
+    // A sees B's message live, no reload.
+    await expect(pageA.locator('[data-testid="room-message"]', { hasText: stamp })).toBeVisible({ timeout: 5_000 });
+
+    // Member list shows both.
+    await pageA.getByTestId('room-members-toggle').click();
+    await expect(pageA.getByTestId('room-members-list')).toBeVisible();
+    await expect(pageA.getByTestId('room-members-list')).toContainText(state.userBDisplayName!);
+
+    await pageB.getByTestId('room-leave').click();
+    await expect(pageB).toHaveURL(/\/rooms$/, { timeout: 10_000 });
   } finally {
     await ctxA.close();
     await ctxB.close();
@@ -955,6 +1063,17 @@ test('blocking a user removes them from search results', async ({ page, playwrig
   await page.getByTestId('user-search').fill(userD.username);
   await page.waitForTimeout(500);
   await expect(page.getByTestId(`user-result-${userD.id}`)).toBeHidden();
+
+  // D shows up in the Profile "Blocked users" list, and unblocking restores
+  // them to search.
+  await page.getByTestId('nav-profile').click();
+  await expect(page.getByTestId(`blocked-user-${userD.id}`)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId(`unblock-${userD.id}`).click();
+  await expect(page.getByTestId(`blocked-user-${userD.id}`)).toBeHidden();
+
+  await page.getByTestId('nav-chats').click();
+  await page.getByTestId('user-search').fill(userD.username);
+  await expect(page.getByTestId(`user-result-${userD.id}`)).toBeVisible({ timeout: 10_000 });
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

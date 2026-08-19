@@ -117,7 +117,7 @@ export class ChatService {
         type: (data.type as any) || 'TEXT',
       },
       include: {
-        sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+        sender: { select: { id: true, username: true, displayName: true, avatarUrl: true, avatarConfig: true } },
       },
     });
   }

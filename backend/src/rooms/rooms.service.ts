@@ -15,7 +15,7 @@ export class RoomsService {
           create: { userId, role: 'owner' },
         },
       },
-      include: { members: { include: { user: { select: { id: true, username: true, displayName: true, avatarUrl: true } } } } },
+      include: { members: { include: { user: { select: { id: true, username: true, displayName: true, avatarUrl: true, avatarConfig: true } } } } },
     });
     return room;
   }
@@ -41,7 +41,7 @@ export class RoomsService {
       where: { id },
       include: {
         members: {
-          include: { user: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true } } },
+          include: { user: { select: { id: true, username: true, displayName: true, avatarUrl: true, isOnline: true, avatarConfig: true } } },
         },
         _count: { select: { members: true } },
       },
@@ -83,7 +83,7 @@ export class RoomsService {
         ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
       },
       include: {
-        sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+        sender: { select: { id: true, username: true, displayName: true, avatarUrl: true, avatarConfig: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,

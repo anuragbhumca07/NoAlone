@@ -33,6 +33,8 @@ export default function Profile() {
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<string | null>(null);
   const [pwErr, setPwErr] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<any[]>([]);
+  const [blockedErr, setBlockedErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +60,20 @@ export default function Profile() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    api.getBlockedUsers().then(setBlocked).catch((e) => setBlockedErr(e?.message || 'Could not load blocked users'));
+  }, []);
+
+  const unblock = async (userId: string) => {
+    setBlockedErr(null);
+    try {
+      await api.unblockUser(userId);
+      setBlocked((prev) => prev.filter((u) => u.id !== userId));
+    } catch (e: any) {
+      setBlockedErr(e?.message || 'Could not unblock');
+    }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,6 +299,29 @@ export default function Profile() {
             ▶ Preview
           </button>
         </div>
+      </div>
+
+      <div className="card" style={{ maxWidth: 640, marginTop: 24 }} data-testid="blocked-users-card">
+        <h3 style={{ marginTop: 0 }}>Blocked users</h3>
+        {blockedErr && <div className="err" data-testid="blocked-users-error">{blockedErr}</div>}
+        {blocked.length === 0 ? (
+          <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 0 }} data-testid="no-blocked-users">
+            You haven't blocked anyone.
+          </p>
+        ) : (
+          blocked.map((u) => (
+            <div key={u.id} className="row" style={{ marginBottom: 8 }} data-testid={`blocked-user-${u.id}`}>
+              <UserAvatar name={u.displayName} avatarConfig={u.avatarConfig} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{u.displayName}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>@{u.username}</div>
+              </div>
+              <button className="ghost" onClick={() => unblock(u.id)} data-testid={`unblock-${u.id}`}>
+                Unblock
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

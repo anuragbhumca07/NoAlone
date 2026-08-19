@@ -40,7 +40,10 @@ export default function Conversation() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [safetyMsg, setSafetyMsg] = useState<string | null>(null);
+  const [otherTyping, setOtherTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmitRef = useRef(0);
 
   useEffect(() => {
     if (!id) return;
@@ -109,15 +112,31 @@ export default function Conversation() {
       setMessages((prev) => prev.map((m) => (m.senderId === user?.id ? { ...m, isRead: true } : m)));
     };
 
+    // The backend just relays raw pings (no explicit "stopped typing" event),
+    // so treat each ping as "typing for the next few seconds" and let the
+    // indicator expire on its own if pings stop arriving.
+    const onTyping = (data: { userId: string; conversationId: string }) => {
+      if (data.conversationId !== id || data.userId !== otherUser?.id) return;
+      setOtherTyping(true);
+      if (typingClearRef.current) clearTimeout(typingClearRef.current);
+      typingClearRef.current = setTimeout(() => setOtherTyping(false), 3000);
+    };
+
     socket.on('message:new', onNew);
     socket.on('message:delivered', onDelivered);
     socket.on('message:read', onRead);
+    socket.on('message:typing', onTyping);
     return () => {
       socket.off('message:new', onNew);
       socket.off('message:delivered', onDelivered);
       socket.off('message:read', onRead);
+      socket.off('message:typing', onTyping);
+      if (typingClearRef.current) clearTimeout(typingClearRef.current);
     };
   }, [token, id, user?.id, otherUser?.id]);
+
+  // Clear any stale typing indicator when switching threads.
+  useEffect(() => { setOtherTyping(false); }, [id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -306,12 +325,26 @@ export default function Conversation() {
             </div>
           );
         })}
+        {otherTyping && (
+          <div className="bubble" data-testid="typing-indicator">
+            <span className="ai-typing"><span /><span /><span /></span>
+          </div>
+        )}
       </div>
 
       <form className="composer" onSubmit={send}>
         <input
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (!token || !id || !otherUser) return;
+            const now = Date.now();
+            // Throttle to at most one ping every 2s while actively typing.
+            if (now - lastTypingEmitRef.current > 2000) {
+              lastTypingEmitRef.current = now;
+              getSocket(token)?.emit('message:typing', { conversationId: id, targetUserId: otherUser.id });
+            }
+          }}
           placeholder="Type a message…"
           data-testid="composer-input"
         />

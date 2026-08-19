@@ -151,6 +151,26 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
   clearAiMessages: () => request<{ success: boolean }>('ai-companion/messages', { method: 'DELETE' }),
+
+  // ── Rooms (public group chats) ──
+  listRooms: (filters?: { language?: string; topic?: string; isLive?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filters?.language) params.set('language', filters.language);
+    if (filters?.topic) params.set('topic', filters.topic);
+    if (filters?.isLive !== undefined) params.set('isLive', String(filters.isLive));
+    const qs = params.toString();
+    return request<any[]>(`rooms${qs ? `?${qs}` : ''}`);
+  },
+  myRooms: () => request<any[]>('rooms/mine'),
+  createRoom: (dto: { name: string; description?: string; topic?: string; language?: string; maxMembers?: number }) =>
+    request<any>('rooms', { method: 'POST', body: JSON.stringify(dto) }),
+  getRoom: (id: string) => request<any>(`rooms/${id}`),
+  joinRoom: (id: string) => request<any>(`rooms/${id}/join`, { method: 'POST' }),
+  leaveRoom: (id: string) => request<{ success: boolean }>(`rooms/${id}/leave`, { method: 'POST' }),
+  getRoomMessages: (id: string, cursor?: string) =>
+    request<any[]>(`rooms/${id}/messages${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  setRoomLive: (id: string, isLive: boolean) =>
+    request<any>(`rooms/${id}/live`, { method: 'PATCH', body: JSON.stringify({ isLive }) }),
 };
 
 export { API_URL };

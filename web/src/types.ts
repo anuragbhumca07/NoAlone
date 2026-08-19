@@ -37,7 +37,33 @@ export interface Message {
   isRead: boolean;
   deliveredAt?: string | null;
   createdAt: string;
-  sender?: { id: string; displayName: string; avatarUrl?: string | null };
+  sender?: { id: string; displayName: string; avatarUrl?: string | null; avatarConfig?: import('./avatar').AvatarConfig | null };
+}
+
+export interface RoomMember {
+  id: string;
+  roomId: string;
+  userId: string;
+  role: 'owner' | 'moderator' | 'member';
+  joinedAt: string;
+  user?: User;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  description?: string | null;
+  coverUrl?: string | null;
+  type: 'PUBLIC' | 'PRIVATE';
+  topic?: string | null;
+  language: string;
+  maxMembers: number;
+  isLive: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  members?: RoomMember[];
+  _count?: { members: number };
 }
 
 export type CallType = 'VOICE' | 'VIDEO';
