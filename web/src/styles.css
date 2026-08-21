@@ -727,3 +727,61 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
   color: var(--text-dim);
   padding: 0 4px;
 }
+
+/* ── Floating cloud ads — self-promo for the app's own features ────────────── */
+
+.floating-ads {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ad-cloud {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px 12px 16px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  pointer-events: auto;
+  opacity: 0.92;
+  animation-name: cloud-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  transition: opacity 150ms, transform 150ms;
+}
+.ad-cloud:hover { opacity: 1; transform: scale(1.04); filter: none; }
+.ad-cloud-icon { font-size: 17px; }
+/* The classic "puffy cloud" trick — a pill shape plus a couple of circles
+   bumped on top, all sharing the panel color so it reads as one shape. */
+.ad-cloud::before,
+.ad-cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border: inherit;
+  border-radius: 50%;
+  z-index: -1;
+}
+.ad-cloud::before { width: 24px; height: 24px; top: -10px; left: 16px; }
+.ad-cloud::after { width: 32px; height: 32px; top: -15px; left: 36px; }
+
+@keyframes cloud-drift {
+  from { transform: translateX(-24vw) translateY(0); }
+  50% { transform: translateX(50vw) translateY(-18px); }
+  to { transform: translateX(124vw) translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .ad-cloud { display: none; }
+}

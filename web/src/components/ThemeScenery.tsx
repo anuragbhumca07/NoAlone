@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTheme } from '../theme';
+import FloatingAds from './FloatingAds';
 
 // Deterministic pseudo-random star field — same layout every render (no
 // reshuffling on re-render), cheap to compute, no external assets.
@@ -24,6 +25,7 @@ export default function ThemeScenery() {
   const stars = useStars(70);
 
   return (
+    <>
     <div className="theme-scenery" aria-hidden="true" data-testid="theme-scenery" data-theme-mood={theme}>
       {theme === 'flower' && (
         <>
@@ -54,6 +56,9 @@ export default function ThemeScenery() {
           <div className="scenery-horizon" />
         </>
       )}
+
     </div>
+    <FloatingAds />
+    </>
   );
 }

@@ -116,6 +116,34 @@ test('home page renders the landing page for unauthenticated visitors', async ({
   await expect(page.getByTestId('login-card')).toBeVisible();
 });
 
+test('floating ad clouds render for guests and link to signup', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('home-page')).toBeVisible();
+  await expect(page.getByTestId('floating-ads')).toBeVisible();
+
+  const cloud = page.locator('.ad-cloud').first();
+  await expect(cloud).toBeVisible();
+  await expect(cloud).toHaveAttribute('href', '/register');
+});
+
+test('floating ad clouds inside the app link to real features', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+
+  await expect(page.getByTestId('floating-ads')).toBeVisible();
+  // The cloud drifts continuously (by design) — freeze the animation so the
+  // click lands on a stationary target, same as a real click would land
+  // fine on a slow-moving element a human can track and click.
+  await page.addStyleTag({ content: '.ad-cloud { animation-play-state: paused !important; }' });
+  const roomsCloud = page.getByTestId('ad-cloud-rooms');
+  await expect(roomsCloud).toBeVisible();
+  await roomsCloud.click();
+  await expect(page).toHaveURL(/\/rooms$/);
+});
+
 // ════════════════════════════════════════════════════════════════════════════════
 // 2. Sign-up — wrong-shape inputs are rejected
 // ════════════════════════════════════════════════════════════════════════════════
