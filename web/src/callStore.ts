@@ -11,6 +11,7 @@ export interface ActiveCall {
   meetLink?: string;
   phase: CallPhase;
   connectedAt?: number;
+  ringingSince?: number;
 }
 
 type Listener = () => void;
@@ -20,14 +21,16 @@ class CallStore {
   current: ActiveCall | null = null;
   /** Reference to the window.open()'d Meet tab, so we can re-focus it. */
   meetWindow: Window | null = null;
+  /** Set when the browser blocked the popup, so the UI can offer a manual "Open Meet" fallback. */
+  meetBlocked = false;
 
   startOutgoing(call: Omit<ActiveCall, 'phase' | 'direction'>) {
-    this.current = { ...call, direction: 'outgoing', phase: 'ringing-out' };
+    this.current = { ...call, direction: 'outgoing', phase: 'ringing-out', ringingSince: Date.now() };
     this.notify();
   }
 
   receiveIncoming(call: Omit<ActiveCall, 'phase' | 'direction'>) {
-    this.current = { ...call, direction: 'incoming', phase: 'ringing-in' };
+    this.current = { ...call, direction: 'incoming', phase: 'ringing-in', ringingSince: Date.now() };
     this.notify();
   }
 
@@ -45,6 +48,8 @@ class CallStore {
       return;
     }
     this.meetWindow = window.open(link, '_blank', 'noopener');
+    this.meetBlocked = !this.meetWindow;
+    this.notify();
   }
 
   focusMeet() {
@@ -54,6 +59,7 @@ class CallStore {
   clear() {
     this.current = null;
     this.meetWindow = null;
+    this.meetBlocked = false;
     this.notify();
   }
 

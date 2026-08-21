@@ -171,6 +171,23 @@ button.danger { background: var(--bad); }
 button.success { background: var(--good); }
 button.warn { background: var(--warn); color: #1b1300; }
 
+/* An <a> styled to match buttons — used where a real link (e.g. opening
+   Meet) is more robust than a click handler calling window.open(). */
+a.ghost {
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  transition: filter 120ms, background 120ms, transform 120ms;
+}
+a.ghost:hover { background: var(--panel-2); transform: translateY(-1px); }
+
 input, textarea, select {
   font-family: inherit;
   background: var(--panel-2);
@@ -381,6 +398,22 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
   text-align: center;
 }
 .ringing-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: pulse 1s infinite; margin-right: 6px; }
+
+.call-modal { max-width: 400px; }
+.call-avatar-pulse { box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.5); animation: call-pulse 1.6s infinite; }
+@keyframes call-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.45); }
+  70% { box-shadow: 0 0 0 18px rgba(124, 92, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 92, 255, 0); }
+}
+.call-meet-status {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  text-align: left;
+}
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }

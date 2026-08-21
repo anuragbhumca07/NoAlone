@@ -43,6 +43,12 @@ export class MatchingService {
     return { status: 'left', message: 'Removed from matching pool' };
   }
 
+  /** How many people are actively searching for a random match right now. */
+  async getPoolCount(): Promise<{ count: number }> {
+    const pool = await this.redis.getMatchingPool();
+    return { count: pool.length };
+  }
+
   async findMatch(userId: string): Promise<{ matched: boolean; user?: any; conversationId?: string }> {
     const pool = await this.redis.getMatchingPool();
     const myData = await this.redis.getMatchingData(userId);

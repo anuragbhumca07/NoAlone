@@ -783,6 +783,65 @@ test('unread badge appears on nav + conversation row until the thread is opened'
 // 9e. Random matching — two users both hit Start and land in the same conversation
 // ════════════════════════════════════════════════════════════════════════════════
 
+test('the "searching right now" count reflects active searchers, not just being logged in', async ({ browser, playwright }) => {
+  const baseURL = BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`;
+  const ctx = await playwright.request.newContext({ baseURL });
+  // Seed directly (rather than via seedSupabaseUser) so we also get the
+  // backend JWT it doesn't return, needed here for direct API calls.
+  const emailE = `web-e.${Date.now()}@testmail.noalone`;
+  const seedRes = await ctx.post('auth/test/supabase-seed-user', {
+    data: { email: emailE, password: PASSWORD, testKey: TEST_API_KEY },
+  });
+  const { accessToken } = await seedRes.json();
+  const syncRes = await ctx.post('auth/supabase-sync', { data: { accessToken } });
+  const { token: eToken } = await syncRes.json();
+
+  const poolCount = async () => {
+    const res = await ctx.get('matching/pool-count', { headers: { Authorization: `Bearer ${eToken}` } });
+    return (await res.json()).count as number;
+  };
+
+  const pageA = await (await browser.newContext()).newPage();
+  const pageE = await (await browser.newContext()).newPage();
+
+  try {
+    // A merely logs in and browses — present/online, but never opts into
+    // random matching. This must NOT move the pool count.
+    await pageA.goto('/login');
+    await pageA.getByTestId('login-email').fill(USER_A_EMAIL);
+    await pageA.getByTestId('login-password').fill(PASSWORD);
+    await pageA.getByTestId('login-submit').click();
+    await expect(pageA).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageA.waitForTimeout(1000);
+
+    const beforeE = await poolCount();
+
+    await pageE.goto('/login');
+    await pageE.getByTestId('login-email').fill(emailE);
+    await pageE.getByTestId('login-password').fill(PASSWORD);
+    await pageE.getByTestId('login-submit').click();
+    await expect(pageE).toHaveURL(/\/chats$/, { timeout: 15_000 });
+    await pageE.goto('/random');
+    await expect(pageE.getByTestId('random-chat-page')).toBeVisible();
+    await pageE.getByTestId('random-start').click();
+    await expect(pageE.getByTestId('random-searching')).toBeVisible({ timeout: 5_000 });
+
+    // Only once E actually clicks Start does the pool count go up.
+    await expect(async () => {
+      expect(await poolCount()).toBe(beforeE + 1);
+    }).toPass({ timeout: 5_000 });
+
+    await pageE.getByTestId('random-cancel').click();
+    await expect(async () => {
+      expect(await poolCount()).toBe(beforeE);
+    }).toPass({ timeout: 5_000 });
+  } finally {
+    await ctx.dispose();
+    await pageA.context().close();
+    await pageE.context().close();
+  }
+});
+
 test('random match pairs two searching users into a shared conversation', async ({ browser }) => {
   test.skip(!state.userAId || !state.userBId, 'No seeded users yet');
 

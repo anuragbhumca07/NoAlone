@@ -159,6 +159,7 @@ export const api = {
 
   // ── Random matching ──
   matchHistory: () => request<any[]>('matching/history'),
+  matchPoolCount: () => request<{ count: number }>('matching/pool-count'),
 
   // ── AI companion ──
   getAiCompanion: () => request<any>('ai-companion/me'),

@@ -13,11 +13,18 @@ export default function RandomChat() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('idle');
   const [genderPref, setGenderPref] = useState<GenderPref>('ANY');
-  const [onlineCount, setOnlineCount] = useState<number | null>(null);
+  const [poolCount, setPoolCount] = useState<number | null>(null);
   const startedAt = useRef<number>(0);
 
+  const refreshPoolCount = () => api.matchPoolCount().then((r) => setPoolCount(r.count)).catch(() => {});
+
   useEffect(() => {
-    api.getOnlineUsers().then((list) => setOnlineCount(list.length)).catch(() => {});
+    refreshPoolCount();
+    // Keep the "searching now" count fresh while this page is open — it's
+    // the number that actually predicts whether Start will find someone,
+    // unlike general online presence.
+    const interval = setInterval(refreshPoolCount, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -29,7 +36,7 @@ export default function RandomChat() {
       setPhase('idle');
       navigate(`/chats/${result.conversationId}`);
     };
-    const onTimeout = () => setPhase('timeout');
+    const onTimeout = () => { setPhase('timeout'); refreshPoolCount(); };
     const onError = () => setPhase('error');
 
     socket.on('match:found', onFound);
@@ -58,7 +65,12 @@ export default function RandomChat() {
     const socket = getMatchingSocket(token);
     socket?.emit('match:cancel');
     setPhase('idle');
+    refreshPoolCount();
   };
+
+  // Once I click Start, I'm part of the pool too — the "before you start"
+  // count and "how many others" are one apart, worth being precise about.
+  const othersSearching = phase === 'searching' ? Math.max(0, (poolCount ?? 1) - 1) : poolCount;
 
   return (
     <div data-testid="random-chat-page">
@@ -66,16 +78,18 @@ export default function RandomChat() {
         <h2 style={{ margin: 0 }}>Meet someone new</h2>
       </div>
       <p style={{ color: 'var(--text-dim)', marginTop: 0 }}>
-        Get matched instantly with another noAlone member. Chat, then start a voice or video call from
-        the conversation — same as any other chat.
+        Get matched instantly with another noAlone member who's <em>also</em> hitting Start right now.
+        Chat, then start a voice or video call from the conversation — same as any other chat.
       </p>
 
       <div className="card" style={{ maxWidth: 480 }}>
-        {onlineCount !== null && (
-          <div className="chip online" style={{ marginBottom: 16 }} data-testid="random-online-count">
-            ● {onlineCount} online now
-          </div>
-        )}
+        <div
+          className={`chip ${(othersSearching ?? 0) > 0 ? 'online' : ''}`}
+          style={{ marginBottom: 16 }}
+          data-testid="random-online-count"
+        >
+          ● {othersSearching ?? '…'} {othersSearching === 1 ? 'person' : 'people'} searching right now
+        </div>
 
         {phase === 'idle' || phase === 'timeout' || phase === 'error' ? (
           <>
@@ -98,9 +112,11 @@ export default function RandomChat() {
               <div className="ai-nudge" data-testid="random-timeout">
                 <span style={{ fontSize: 28 }}>🤖</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>No one's free right now</div>
+                  <div style={{ fontWeight: 600 }}>Nobody else was searching at the same time</div>
                   <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                    Chat with your AI buddy while you wait, or try matching again in a bit.
+                    This matches you with someone else who's also searching <em>right now</em> — it's
+                    not that no one's around, just no one hit Start in the last minute. Chat with your
+                    AI buddy while you wait, or try again.
                   </div>
                 </div>
                 <button onClick={() => navigate('/ai-buddy')} data-testid="random-chat-ai-cta">

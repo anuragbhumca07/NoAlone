@@ -35,4 +35,10 @@ export class MatchingController {
   getMatches(@Req() req: any) {
     return this.matchingService.getMatches(req.user.id);
   }
+
+  @Get('pool-count')
+  @ApiOperation({ summary: 'How many people are actively searching for a match right now' })
+  getPoolCount() {
+    return this.matchingService.getPoolCount();
+  }
 }
