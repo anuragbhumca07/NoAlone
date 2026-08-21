@@ -21,6 +21,7 @@ enum MessageType {
   IMAGE
   AUDIO
   VIDEO
+  FILE
   SYSTEM
 }
 
@@ -161,6 +162,8 @@ model Message {
   senderId       String
   content        String?
   mediaUrl       String?
+  fileName       String?
+  fileSize       Int?
   type           MessageType @default(TEXT)
   isRead         Boolean     @default(false)
   readAt         DateTime?

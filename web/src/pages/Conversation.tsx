@@ -6,7 +6,15 @@ import { getSocket } from '../socket';
 import { chatStore } from '../chatStore';
 import { callStore } from '../callStore';
 import UserAvatar from '../components/UserAvatar';
+import EmojiPicker from '../components/EmojiPicker';
 import type { Message } from '../types';
+
+function formatFileSize(bytes?: number | null): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -41,9 +49,14 @@ export default function Conversation() {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [safetyMsg, setSafetyMsg] = useState<string | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmitRef = useRef(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -139,6 +152,15 @@ export default function Conversation() {
   useEffect(() => { setOtherTyping(false); }, [id]);
 
   useEffect(() => {
+    if (!attachOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (attachRef.current && !attachRef.current.contains(e.target as Node)) setAttachOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [attachOpen]);
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length]);
 
@@ -167,6 +189,44 @@ export default function Conversation() {
         type: 'TEXT',
         tempId,
       });
+    }
+  };
+
+  const sendFile = async (file: File) => {
+    if (!id || !token) return;
+    setAttachOpen(false);
+    setUploading(true);
+    setErr(null);
+    try {
+      const res = await api.uploadChatMedia(file);
+      const tempId = `local-${Date.now()}`;
+      setMessages((prev) => [...prev, {
+        id: tempId,
+        conversationId: id,
+        senderId: user?.id || '',
+        content: null,
+        mediaUrl: res.url,
+        fileName: res.fileName,
+        fileSize: res.fileSize,
+        type: res.isImage ? 'IMAGE' : 'FILE',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      }]);
+      if (otherUser) {
+        getSocket(token)?.emit('message:send', {
+          conversationId: id,
+          targetUserId: otherUser.id,
+          type: res.isImage ? 'IMAGE' : 'FILE',
+          mediaUrl: res.url,
+          fileName: res.fileName,
+          fileSize: res.fileSize,
+          tempId,
+        });
+      }
+    } catch (e: any) {
+      setErr(e?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -317,7 +377,21 @@ export default function Conversation() {
           const mine = m.senderId === user?.id;
           return (
             <div key={m.id} className={`bubble ${mine ? 'mine' : ''}`} data-testid="message">
-              <div>{m.content}</div>
+              {m.type === 'IMAGE' && m.mediaUrl ? (
+                <a href={m.mediaUrl} target="_blank" rel="noreferrer">
+                  <img src={m.mediaUrl} alt={m.fileName || 'shared image'} className="bubble-image" data-testid="message-image" />
+                </a>
+              ) : m.type === 'FILE' && m.mediaUrl ? (
+                <a href={m.mediaUrl} target="_blank" rel="noreferrer" className="bubble-file" data-testid="message-file">
+                  <span className="bubble-file-icon">📄</span>
+                  <span>
+                    <div className="bubble-file-name">{m.fileName || 'File'}</div>
+                    <div className="bubble-file-size">{formatFileSize(m.fileSize)}</div>
+                  </span>
+                </a>
+              ) : (
+                <div>{m.content}</div>
+              )}
               <div className="bubble-meta">
                 <span data-testid="message-time">{formatTime(m.createdAt)}</span>
                 {mine && <Tick m={m} />}
@@ -332,7 +406,52 @@ export default function Conversation() {
         )}
       </div>
 
+      {uploading && (
+        <div className="upload-progress" data-testid="upload-progress">
+          <span className="ai-typing"><span /><span /><span /></span> Uploading…
+        </div>
+      )}
+
       <form className="composer" onSubmit={send}>
+        <div ref={attachRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setAttachOpen((o) => !o)}
+            data-testid="attach-toggle"
+            title="Attach"
+          >
+            📎
+          </button>
+          {attachOpen && (
+            <div className="attach-menu" data-testid="attach-menu">
+              <button type="button" onClick={() => imageInputRef.current?.click()} data-testid="attach-image">
+                🖼️ Photo or GIF
+              </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} data-testid="attach-file">
+                📄 File
+              </button>
+            </div>
+          )}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            data-testid="attach-image-input"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.target.value = ''; }}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            data-testid="attach-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.target.value = ''; }}
+          />
+        </div>
+
+        <EmojiPicker onPick={(emoji) => setText((t) => t + emoji)} />
+
         <input
           value={text}
           onChange={(e) => {

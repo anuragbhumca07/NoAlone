@@ -33,7 +33,9 @@ export interface Message {
   senderId: string;
   content?: string | null;
   mediaUrl?: string | null;
-  type: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'SYSTEM';
+  fileName?: string | null;
+  fileSize?: number | null;
+  type: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'FILE' | 'SYSTEM';
   isRead: boolean;
   deliveredAt?: string | null;
   createdAt: string;

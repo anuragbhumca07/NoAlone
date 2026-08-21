@@ -6,6 +6,7 @@ export enum MessageTypeEnum {
   IMAGE = 'IMAGE',
   AUDIO = 'AUDIO',
   VIDEO = 'VIDEO',
+  FILE = 'FILE',
 }
 
 export class SendMessageDto {
@@ -13,9 +14,10 @@ export class SendMessageDto {
   @IsUUID()
   conversationId: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  content: string;
+  content?: string;
 
   @ApiProperty({ required: false, enum: MessageTypeEnum })
   @IsOptional()
@@ -26,6 +28,15 @@ export class SendMessageDto {
   @IsOptional()
   @IsString()
   mediaUrl?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  fileName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  fileSize?: number;
 }
 
 export class CreateConversationDto {

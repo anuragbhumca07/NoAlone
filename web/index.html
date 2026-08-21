@@ -8,7 +8,8 @@
       // Applied before first paint so switching themes never flashes the wrong palette.
       try {
         var t = localStorage.getItem('noalone_theme');
-        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        if (t === 'dark') t = 'night'; // migrate the old binary toggle's dark mode
+        if (t === 'night' || t === 'sunset') document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     </script>
   </head>

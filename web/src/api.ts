@@ -36,6 +36,26 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append('file', file);
+
+  const res = await fetch(`${API_URL}/${path.replace(/^\//, '')}`, { method: 'POST', headers, body: form });
+  const text = await res.text();
+  let body: any = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+
+  if (!res.ok) {
+    const message = (body && (body.message || body.error)) || `Upload failed (${res.status})`;
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message, body);
+  }
+  return body as T;
+}
+
 export const api = {
   // ── Auth ──
   registerEmail: (email: string, password: string) =>
@@ -171,6 +191,13 @@ export const api = {
     request<any[]>(`rooms/${id}/messages${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   setRoomLive: (id: string, isLive: boolean) =>
     request<any>(`rooms/${id}/live`, { method: 'PATCH', body: JSON.stringify({ isLive }) }),
+
+  // ── Uploads ──
+  uploadChatMedia: (file: File) =>
+    uploadFile<{ url: string; mimeType: string; fileName: string; fileSize: number; isImage: boolean }>(
+      'uploads/chat',
+      file,
+    ),
 };
 
 export { API_URL };

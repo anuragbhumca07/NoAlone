@@ -13,6 +13,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { CallsModule } from './calls/calls.module';
 import { AiCompanionModule } from './ai-companion/ai-companion.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AiCompanionModule } from './ai-companion/ai-companion.module';
     ModerationModule,
     CallsModule,
     AiCompanionModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -10,6 +10,7 @@ import { startRingtone, playMessagePing } from '../sounds';
 import StatusToggle from './StatusToggle';
 import CallPanel from './CallPanel';
 import ThemeToggle from './ThemeToggle';
+import ThemeScenery from './ThemeScenery';
 import UserAvatar from './UserAvatar';
 import type { IncomingCallPayload, Message } from '../types';
 
@@ -125,7 +126,9 @@ export default function AppShell() {
   };
 
   return (
-    <div className="layout">
+    <>
+      <ThemeScenery />
+      <div className="layout">
       <aside className="sidebar" data-testid="sidebar">
         <div className="spread" style={{ marginBottom: 8 }}>
           <div className="brand">noAlone</div>
@@ -168,6 +171,7 @@ export default function AppShell() {
       </main>
 
       {call && <CallPanel call={call} />}
-    </div>
+      </div>
+    </>
   );
 }

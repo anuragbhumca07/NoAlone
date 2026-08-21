@@ -18,6 +18,6 @@ import { GoogleStrategy } from './google.strategy';
   ],
   controllers: [AuthController],
   providers: [AuthService, EmailService, SupabaseService, JwtStrategy, GoogleStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, SupabaseService],
 })
 export class AuthModule {}

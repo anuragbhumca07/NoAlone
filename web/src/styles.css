@@ -1,4 +1,37 @@
+/* ── Themes ───────────────────────────────────────────────────────────────
+   Three moods, picked via the header theme switcher and persisted in
+   localStorage (applied pre-paint by index.html's inline script so there's
+   never a flash of the wrong palette on load):
+     "flower" (default) — a magical lavender/red/yellow/green/blue fantasy mix
+     "night"             — dark, with stars and a moon drifting behind everything
+     "sunset"            — a warm dusk gradient with a glowing sun
+*/
 :root {
+  /* flower (default) */
+  --bg: linear-gradient(150deg, #f2e9ff 0%, #ffe9f2 26%, #fff7dc 52%, #e9fbf0 76%, #e6f3ff 100%);
+  --panel: #fffdfb;
+  --panel-2: #f7f1ff;
+  --border: #ead9ff;
+  --text: #3a2e52;
+  --text-dim: #7d6d9c;
+  --accent: #9b6bff;
+  --accent-2: #ff7aa8;
+  --pink: #ff6fa5;
+  --good: #2fb27d;
+  --warn: #e2a326;
+  --bad: #f2496a;
+  --radius: 12px;
+  --shadow: 0 8px 24px -10px rgba(120, 80, 180, 0.22);
+  --shadow-lg: 0 24px 60px -16px rgba(155, 107, 255, 0.32);
+
+  --flower-lavender: #b98cff;
+  --flower-red: #ff7a7a;
+  --flower-yellow: #ffd166;
+  --flower-green: #63d68a;
+  --flower-blue: #5fb2ff;
+}
+
+:root[data-theme="night"] {
   --bg: #0e0f12;
   --panel: #161821;
   --panel-2: #1d2030;
@@ -11,26 +44,25 @@
   --good: #1fbf75;
   --warn: #ffb84d;
   --bad: #ff4d6d;
-  --radius: 12px;
   --shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 24px 60px -16px rgba(124, 92, 255, 0.35);
 }
 
-/* Light theme — opted into via the header toggle, persisted in localStorage
-   and applied pre-paint by an inline script in index.html so there's no
-   flash of the wrong palette on load. */
-:root[data-theme="light"] {
-  --bg: #f6f6fb;
-  --panel: #ffffff;
-  --panel-2: #f2f1fa;
-  --border: #e6e4f2;
-  --text: #1d1b2e;
-  --text-dim: #6b6885;
-  --good: #12996b;
-  --warn: #c2740a;
-  --bad: #d92d54;
-  --shadow: 0 8px 24px -10px rgba(30, 20, 60, 0.12);
-  --shadow-lg: 0 24px 60px -16px rgba(124, 92, 255, 0.22);
+:root[data-theme="sunset"] {
+  --bg: linear-gradient(180deg, #2a1150 0%, #6c2f68 32%, #c94b74 56%, #f17a56 76%, #ffc266 100%);
+  --panel: #2a1a2e;
+  --panel-2: #38232f;
+  --border: rgba(255, 195, 150, 0.2);
+  --text: #fff1e6;
+  --text-dim: #e6bcc4;
+  --accent: #ff7a59;
+  --accent-2: #ffb347;
+  --pink: #ff86a8;
+  --good: #6fcf97;
+  --warn: #ffd166;
+  --bad: #ff5d7a;
+  --shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 60px -16px rgba(255, 122, 89, 0.35);
 }
 
 * { box-sizing: border-box; }
@@ -38,9 +70,85 @@ html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
   background: var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  transition: background 180ms ease, color 180ms ease;
+  transition: background 260ms ease, color 180ms ease;
+}
+
+/* ── Theme scenery — a fixed, non-interactive decorative backdrop ──────────── */
+
+.theme-scenery {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.layout, .center-screen, .landing { position: relative; z-index: 1; }
+
+/* flower: slow-drifting soft color blobs */
+.scenery-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.4;
+  animation: blob-drift 26s ease-in-out infinite;
+}
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3%, -4%) scale(1.08); }
+}
+
+/* night: twinkling stars + moon */
+.scenery-star {
+  position: absolute;
+  width: 2px; height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  animation: star-twinkle 3.2s ease-in-out infinite;
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+.scenery-moon {
+  position: absolute;
+  top: 8%;
+  right: 9%;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fffef2, #f3edc9 55%, #e4dba0 100%);
+  box-shadow: 0 0 70px 18px rgba(240, 235, 200, 0.35);
+}
+.scenery-moon::before,
+.scenery-moon::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(160, 150, 110, 0.25);
+}
+.scenery-moon::before { width: 18px; height: 18px; top: 20px; left: 16px; }
+.scenery-moon::after { width: 12px; height: 12px; top: 50px; left: 50px; }
+
+/* sunset: glowing sun + horizon glow */
+.scenery-sun {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, #fff6d0 0%, #ffd27a 40%, #ff9a5a 75%, rgba(255, 154, 90, 0) 100%);
+  box-shadow: 0 0 120px 40px rgba(255, 180, 100, 0.35);
+}
+.scenery-horizon {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 22%;
+  background: linear-gradient(180deg, rgba(255, 140, 90, 0) 0%, rgba(120, 40, 70, 0.35) 100%);
 }
 
 a { color: var(--accent-2); text-decoration: none; }
@@ -129,17 +237,28 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
 .sidebar a.active, .sidebar a:hover { background: var(--panel-2); color: var(--text); }
 .sidebar a.active { box-shadow: inset 3px 0 0 var(--accent); }
 
-.theme-toggle {
-  display: flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px;
-  border-radius: 999px;
+.theme-switcher {
+  display: flex;
+  gap: 2px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  color: var(--text);
-  padding: 0;
-  font-size: 16px;
+  border-radius: 999px;
+  padding: 3px;
 }
-.theme-toggle:hover:not(:disabled) { filter: none; background: var(--border); transform: none; }
+.theme-switcher button {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 0;
+  font-size: 15px;
+}
+.theme-switcher button:hover:not(:disabled) { filter: none; transform: none; background: var(--border); color: var(--text); }
+.theme-switcher button.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white;
+}
 
 .badge {
   display: inline-flex;
@@ -531,4 +650,80 @@ label { display: block; font-size: 13px; color: var(--text-dim); margin: 12px 0 
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+/* ── Composer add-ons: emoji + attachments ──────────────────────────────────── */
+
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 12px;
+  z-index: 20;
+}
+.emoji-picker-label { font-size: 11px; color: var(--text-dim); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.emoji-picker-label:first-child { margin-top: 0; }
+.emoji-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.emoji-picker-btn {
+  background: transparent;
+  padding: 4px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 6px;
+}
+.emoji-picker-btn:hover:not(:disabled) { background: var(--panel-2); filter: none; transform: none; }
+
+.attach-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 20;
+}
+.attach-menu button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+.attach-menu button:hover:not(:disabled) { background: var(--panel-2); filter: none; transform: none; }
+
+.bubble-image {
+  display: block;
+  max-width: 260px;
+  max-height: 320px;
+  border-radius: 10px;
+  object-fit: cover;
+  cursor: pointer;
+}
+.bubble-file {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 2px;
+  color: inherit;
+}
+.bubble-file-icon { font-size: 22px; }
+.bubble-file-name { font-size: 13px; font-weight: 600; word-break: break-all; }
+.bubble-file-size { font-size: 11px; opacity: 0.75; }
+
+.upload-progress {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 0 4px;
 }

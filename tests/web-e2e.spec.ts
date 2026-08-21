@@ -16,6 +16,10 @@
  */
 
 import { test, expect } from '@playwright/test';
+import path from 'path';
+
+const FIXTURE_IMAGE = path.join(__dirname, 'fixtures', 'test-image.png');
+const FIXTURE_FILE = path.join(__dirname, 'fixtures', 'test-file.txt');
 
 const BACKEND_URL =
   process.env.BACKEND_URL || 'https://noalone-api-production.up.railway.app/api/v1';
@@ -231,7 +235,7 @@ test('sidebar navigation hits Chats / Calls / Profile', async ({ page }) => {
 // 5a. Dark mode toggle — persists across reload
 // ════════════════════════════════════════════════════════════════════════════════
 
-test('theme toggle switches light/dark and persists on reload', async ({ page }) => {
+test('theme switcher cycles flower/night/sunset and persists on reload', async ({ page }) => {
   await page.goto('/login');
   await page.getByTestId('login-email').fill(USER_A_EMAIL);
   await page.getByTestId('login-password').fill(PASSWORD);
@@ -239,18 +243,26 @@ test('theme toggle switches light/dark and persists on reload', async ({ page })
   await expect(page).toHaveURL(/\/chats$/);
 
   const html = page.locator('html');
-  // Default is dark (no data-theme attribute).
-  await expect(html).not.toHaveAttribute('data-theme', 'light');
+  // Default is the flower theme (no data-theme attribute).
+  await expect(html).not.toHaveAttribute('data-theme');
+  await expect(page.locator('[data-testid="theme-scenery"][data-theme-mood="flower"]')).toBeVisible();
 
-  await page.getByTestId('theme-toggle').click();
-  await expect(html).toHaveAttribute('data-theme', 'light');
+  await page.getByTestId('theme-night').click();
+  await expect(html).toHaveAttribute('data-theme', 'night');
+  await expect(page.locator('[data-testid="theme-scenery"][data-theme-mood="night"]')).toBeVisible();
+  // Stars + moon render.
+  await expect(page.locator('.scenery-moon')).toBeVisible();
 
   await page.reload();
-  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect(html).toHaveAttribute('data-theme', 'night');
 
-  // Toggle back so later tests see the default dark palette.
-  await page.getByTestId('theme-toggle').click();
-  await expect(html).not.toHaveAttribute('data-theme', 'light');
+  await page.getByTestId('theme-sunset').click();
+  await expect(html).toHaveAttribute('data-theme', 'sunset');
+  await expect(page.locator('.scenery-sun')).toBeVisible();
+
+  // Back to flower so later tests see the default palette.
+  await page.getByTestId('theme-flower').click();
+  await expect(html).not.toHaveAttribute('data-theme');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -477,6 +489,75 @@ test('sent message bubble shows a timestamp', async ({ page }) => {
   await expect(bubble.getByTestId('message-time')).toHaveText(/\d{1,2}:\d{2}\s?(AM|PM)?/i);
   // Own messages carry a delivery tick (sent/delivered/read).
   await expect(bubble.locator('.tick')).toBeVisible();
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 8b. Emoji picker inserts into the composer
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('emoji picker inserts an emoji into the composer', async ({ page }) => {
+  test.skip(!state.conversationId, 'No conversation yet');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await page.goto(`/chats/${state.conversationId}`);
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('composer-input').fill('hey ');
+  await page.getByTestId('emoji-picker-toggle').click();
+  await expect(page.getByTestId('emoji-picker')).toBeVisible();
+  await page.getByTestId('emoji-😀').click();
+  await expect(page.getByTestId('emoji-picker')).toBeHidden();
+  await expect(page.getByTestId('composer-input')).toHaveValue('hey 😀');
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 8c. Image and file attachments upload and render in the thread
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('an image attachment uploads and renders as a photo bubble', async ({ page }) => {
+  test.skip(!state.conversationId, 'No conversation yet');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await page.goto(`/chats/${state.conversationId}`);
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('attach-toggle').click();
+  await expect(page.getByTestId('attach-menu')).toBeVisible();
+  await page.getByTestId('attach-image-input').setInputFiles(FIXTURE_IMAGE);
+
+  const image = page.getByTestId('message-image').last();
+  await expect(image).toBeVisible({ timeout: 10_000 });
+  const src = await image.getAttribute('src');
+  expect(src).toMatch(/^https?:\/\//);
+});
+
+test('a file attachment uploads and renders as a downloadable file bubble', async ({ page }) => {
+  test.skip(!state.conversationId, 'No conversation yet');
+
+  await page.goto('/login');
+  await page.getByTestId('login-email').fill(USER_A_EMAIL);
+  await page.getByTestId('login-password').fill(PASSWORD);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
+  await page.goto(`/chats/${state.conversationId}`);
+  await expect(page.getByTestId('conversation-page')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByTestId('attach-toggle').click();
+  await page.getByTestId('attach-file-input').setInputFiles(FIXTURE_FILE);
+
+  const fileBubble = page.getByTestId('message-file').last();
+  await expect(fileBubble).toBeVisible({ timeout: 10_000 });
+  await expect(fileBubble).toContainText('test-file.txt');
+  const href = await fileBubble.getAttribute('href');
+  expect(href).toMatch(/^https?:\/\//);
 });
 
 test('two real browser sessions — sender sees exactly one bubble, receiver gets it live', async ({ browser }) => {

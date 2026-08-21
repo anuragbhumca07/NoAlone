@@ -1,5 +1,7 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../store';
+import ThemeScenery from '../components/ThemeScenery';
+import ThemeToggle from '../components/ThemeToggle';
 
 const FEATURES = [
   {
@@ -30,12 +32,14 @@ export default function Home() {
 
   return (
     <div className="landing" data-testid="home-page">
+      <ThemeScenery />
       <div className="landing-glow landing-glow-a" aria-hidden="true" />
       <div className="landing-glow landing-glow-b" aria-hidden="true" />
 
       <nav className="landing-nav">
         <div className="brand">noAlone</div>
         <div className="row" style={{ gap: 10 }}>
+          <ThemeToggle />
           <Link to="/login" data-testid="home-cta-login">
             <button className="ghost">Sign in</button>
           </Link>

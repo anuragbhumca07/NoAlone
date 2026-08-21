@@ -91,9 +91,11 @@ export class ChatService {
       data: {
         conversationId: dto.conversationId,
         senderId,
-        content: dto.content,
+        content: dto.content || null,
         type: dto.type || 'TEXT',
         mediaUrl: dto.mediaUrl,
+        fileName: dto.fileName,
+        fileSize: dto.fileSize,
       },
       include: {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
