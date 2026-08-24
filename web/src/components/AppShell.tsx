@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { auth, useAuth } from '../store';
 import { getSocket, closeSocket } from '../socket';
 import { api } from '../api';
@@ -19,7 +19,14 @@ export default function AppShell() {
   const { total: unreadTotal } = useUnread();
   const { call } = useActiveCall();
   const navigate = useNavigate();
+  const location = useLocation();
   const stopRingtoneRef = useRef<(() => void) | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Close the mobile nav drawer whenever the route changes.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!token) return;
@@ -129,7 +136,27 @@ export default function AppShell() {
     <>
       <ThemeScenery />
       <div className="layout">
-      <aside className="sidebar" data-testid="sidebar">
+      <div className="mobile-topbar">
+        <button
+          className="ghost mobile-nav-toggle"
+          onClick={() => setMobileNavOpen((v) => !v)}
+          data-testid="mobile-nav-toggle"
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
+        <div className="brand">noAlone</div>
+      </div>
+
+      {mobileNavOpen && (
+        <div
+          className="mobile-nav-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          data-testid="mobile-nav-backdrop"
+        />
+      )}
+
+      <aside className={`sidebar${mobileNavOpen ? ' mobile-open' : ''}`} data-testid="sidebar">
         <div className="spread" style={{ marginBottom: 8 }}>
           <div className="brand">noAlone</div>
           <ThemeToggle />

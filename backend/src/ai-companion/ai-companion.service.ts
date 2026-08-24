@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateReply } from './reply-engine';
 
@@ -9,11 +10,22 @@ export class AiCompanionService {
   constructor(private prisma: PrismaService) {}
 
   async getOrCreate(userId: string) {
-    const existing = await this.prisma.aiCompanion.findUnique({ where: { userId } });
-    if (existing) return existing;
-    return this.prisma.aiCompanion.create({
-      data: { userId, name: 'Alex', gender: 'OTHER', outfit: DEFAULT_OUTFIT },
-    });
+    try {
+      return await this.prisma.aiCompanion.upsert({
+        where: { userId },
+        update: {},
+        create: { userId, name: 'Alex', gender: 'OTHER', outfit: DEFAULT_OUTFIT },
+      });
+    } catch (e) {
+      // Two concurrent first-time requests (e.g. the AI Buddy page firing
+      // getMe + getMessages together) can both miss the upsert's own
+      // conflict check and race on the create; the loser just re-reads
+      // the row the winner created.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        return this.prisma.aiCompanion.findUniqueOrThrow({ where: { userId } });
+      }
+      throw e;
+    }
   }
 
   async update(userId: string, patch: { name?: string; gender?: string; outfit?: object }) {
