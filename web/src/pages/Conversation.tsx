@@ -182,13 +182,18 @@ export default function Conversation() {
     }]);
     const socket = token ? getSocket(token) : null;
     if (socket && otherUser) {
-      socket.emit('message:send', {
-        conversationId: id,
-        targetUserId: otherUser.id,
-        content,
-        type: 'TEXT',
-        tempId,
-      });
+      socket.emit(
+        'message:send',
+        { conversationId: id, targetUserId: otherUser.id, content, type: 'TEXT', tempId },
+        (ack: { success: boolean; error?: string } | undefined) => {
+          if (ack && !ack.success) {
+            // Server rejected the send (e.g. blocked, too long) — the optimistic
+            // bubble would otherwise sit there looking "sent" forever.
+            setMessages((prev) => prev.filter((m) => m.id !== tempId));
+            setErr(ack.error || 'Message could not be sent');
+          }
+        },
+      );
     }
   };
 
@@ -465,6 +470,7 @@ export default function Conversation() {
             }
           }}
           placeholder="Type a message…"
+          maxLength={10000}
           data-testid="composer-input"
         />
         <button type="submit" disabled={!text.trim()} data-testid="composer-send">Send</button>

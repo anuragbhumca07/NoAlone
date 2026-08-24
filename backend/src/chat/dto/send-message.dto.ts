@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum MessageTypeEnum {
@@ -17,6 +17,7 @@ export class SendMessageDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(10000)
   content?: string;
 
   @ApiProperty({ required: false, enum: MessageTypeEnum })

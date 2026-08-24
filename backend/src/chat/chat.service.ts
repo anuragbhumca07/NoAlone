@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto, CreateConversationDto } from './dto/send-message.dto';
 
@@ -79,6 +79,12 @@ export class ChatService {
   }
 
   async saveMessage(senderId: string, dto: SendMessageDto) {
+    // The socket gateway passes the raw payload through untyped, bypassing the
+    // REST DTO's class-validator pipe — enforce the length cap here too.
+    if (dto.content && dto.content.length > 10000) {
+      throw new BadRequestException('Message content exceeds 10,000 characters');
+    }
+
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: dto.conversationId },
     });
