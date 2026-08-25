@@ -5,12 +5,39 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../src/constants';
 import { Ionicons } from '@expo/vector-icons';
 
+// This screen auto-grants camera/mic access to whatever it loads
+// (mediaCapturePermissionGrantType="grant", needed for Meet to work without
+// an extra native permission prompt on top of the OS-level one). It's also
+// reachable via the app's own noalone:// deep link scheme with an
+// attacker-controlled `url` param — without this check, a crafted link
+// could silently load any page with camera/mic access already granted.
+function isTrustedMeetUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname === 'meet.google.com';
+  } catch {
+    return false;
+  }
+}
+
+// Meet's own join flow can redirect through other Google subdomains (auth,
+// consent, etc.) — allow those, but not an arbitrary destination the page
+// might otherwise navigate the WebView to.
+function isTrustedNavigationTarget(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && (parsed.hostname === 'google.com' || parsed.hostname.endsWith('.google.com'));
+  } catch {
+    return false;
+  }
+}
+
 export default function MeetWebViewScreen() {
   const router = useRouter();
   const { url } = useLocalSearchParams<{ url: string }>();
   const [loading, setLoading] = useState(true);
 
-  if (!url) {
+  if (!url || !isTrustedMeetUrl(url)) {
     router.back();
     return null;
   }
@@ -41,6 +68,7 @@ export default function MeetWebViewScreen() {
         mediaCapturePermissionGrantType="grant"
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
+        onShouldStartLoadWithRequest={(request) => isTrustedNavigationTarget(request.url)}
       />
     </View>
   );
