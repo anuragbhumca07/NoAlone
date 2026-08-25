@@ -20,6 +20,11 @@ process.on('uncaughtException', (err) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Behind Railway's reverse proxy, req.ip would otherwise resolve to the
+  // proxy's internal address for every request — trust X-Forwarded-For so
+  // per-IP rate limiting (see ThrottlerModule below) actually works.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Security
   app.use(helmet());
   app.use(compression());

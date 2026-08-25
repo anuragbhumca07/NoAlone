@@ -215,6 +215,7 @@ model RoomMember {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, userId])
+  @@index([userId])
 }
 
 model Match {
@@ -260,6 +261,7 @@ model Block {
   blocked User @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
+  @@index([blockedId])
 }
 
 model Call {

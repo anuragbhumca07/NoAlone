@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Req, Res, Patch, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { IsString } from 'class-validator';
 import { AuthService } from './auth.service';
 import { SendOtpDto, VerifyOtpDto } from './dto/login.dto';
@@ -20,12 +21,14 @@ export class AuthController {
   // ─── Phone OTP ───────────────────────────────────────────────────────────────
 
   @Post('send-otp')
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
   @ApiOperation({ summary: 'Send OTP to phone number' })
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);
   }
 
   @Post('verify-otp')
+  @Throttle({ default: { limit: 20, ttl: 300_000 } })
   @ApiOperation({ summary: 'Verify OTP and login/register' })
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
@@ -42,24 +45,28 @@ export class AuthController {
   // ─── Email Auth ───────────────────────────────────────────────────────────────
 
   @Post('email/register')
+  @Throttle({ default: { limit: 20, ttl: 3_600_000 } })
   @ApiOperation({ summary: 'Register with email + password, triggers verification email' })
   emailRegister(@Body() dto: EmailRegisterDto) {
     return this.authService.registerWithEmail(dto);
   }
 
   @Post('email/verify')
+  @Throttle({ default: { limit: 20, ttl: 600_000 } })
   @ApiOperation({ summary: 'Verify email with 6-digit code' })
   emailVerify(@Body() dto: EmailVerifyDto) {
     return this.authService.verifyEmail(dto);
   }
 
   @Post('email/login')
+  @Throttle({ default: { limit: 30, ttl: 900_000 } })
   @ApiOperation({ summary: 'Login with email + password' })
   emailLogin(@Body() dto: EmailLoginDto) {
     return this.authService.loginWithEmail(dto);
   }
 
   @Post('email/recover-code')
+  @Throttle({ default: { limit: 20, ttl: 3_600_000 } })
   @ApiOperation({
     summary:
       'Retrieve own pending verification code (requires password). Use this if the verification email never arrived.',
