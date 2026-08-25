@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import { discovery as googleDiscovery } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../src/constants';
 import Button from '../../src/components/Button';
@@ -26,7 +27,7 @@ export default function AuthorizeCallsScreen() {
   const { setGoogleAuthorized } = useCallStore();
   const [loading, setLoading] = useState(false);
 
-  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'noalone' });
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -34,8 +35,9 @@ export default function AuthorizeCallsScreen() {
       scopes: CALENDAR_SCOPES,
       responseType: AuthSession.ResponseType.Code,
       extraParams: { access_type: 'offline', prompt: 'consent' },
+      redirectUri,
     },
-    { useProxy: true } as any,
+    googleDiscovery,
   );
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export default function AuthorizeCallsScreen() {
       ) : (
         <Button
           title="Connect Google Calendar"
-          onPress={() => promptAsync({ useProxy: true })}
+          onPress={() => promptAsync()}
           disabled={!request}
           style={styles.btn}
         />

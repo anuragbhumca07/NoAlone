@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { COLORS } from '../../src/constants';
 import Button from '../../src/components/Button';
@@ -22,9 +23,12 @@ export default function WelcomeScreen() {
   const { setToken, setUser } = useAuthStore();
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'noalone' });
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ['openid', 'profile', 'email'],
+    redirectUri,
   });
 
   useEffect(() => {
@@ -56,7 +60,7 @@ export default function WelcomeScreen() {
 
   const handleGooglePress = async () => {
     if (!request) return;
-    await promptAsync({ useProxy: true });
+    await promptAsync();
   };
 
   return (

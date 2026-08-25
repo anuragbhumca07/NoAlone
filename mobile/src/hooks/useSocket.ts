@@ -41,11 +41,10 @@ export function useChatSocket() {
     });
 
     socket.on('call:accepted', (data) => {
-      // Outgoing call was accepted — open the meet link
-      // The OutgoingCallScreen listens for this via the store
-      setOutgoingCall((prev: any) =>
-        prev ? { ...prev, meetLink: data.meetLink, status: 'accepted' } : prev,
-      );
+      // OutgoingCallScreen listens for this itself and drives its own UI;
+      // this just keeps the shared store's meetLink in sync.
+      const current = useCallStore.getState().outgoingCall;
+      if (current) setOutgoingCall({ ...current, meetLink: data.meetLink });
     });
 
     socket.on('call:declined', () => {
