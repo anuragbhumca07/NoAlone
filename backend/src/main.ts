@@ -23,7 +23,14 @@ async function bootstrap() {
   // Behind Railway's reverse proxy, req.ip would otherwise resolve to the
   // proxy's internal address for every request — trust X-Forwarded-For so
   // per-IP rate limiting (see ThrottlerModule below) actually works.
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // `true` (trust the whole chain, take the leftmost/original address) is
+  // used instead of a fixed hop count of 1: Railway's edge routing doesn't
+  // guarantee a constant number of proxy hops per request, and a fixed
+  // count silently extracts the wrong address whenever it doesn't match,
+  // making the same client land in a different rate-limit bucket per
+  // request (confirmed in production — 12 requests from one client
+  // produced 5+ different tracker keys under trust proxy: 1).
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
 
   // Security
   app.use(helmet());
