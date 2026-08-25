@@ -67,9 +67,9 @@ export default function Rooms() {
       {creating && (
         <form onSubmit={create} className="card" style={{ maxWidth: 480, marginBottom: 24 }} data-testid="rooms-create-form">
           <label>Room name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required data-testid="rooms-create-name" placeholder="Late night chill zone" />
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} data-testid="rooms-create-name" placeholder="Late night chill zone" />
           <label>Topic (optional)</label>
-          <input value={topic} onChange={(e) => setTopic(e.target.value)} data-testid="rooms-create-topic" placeholder="music" />
+          <input value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={40} data-testid="rooms-create-topic" placeholder="music" />
           <button type="submit" disabled={busy || !name.trim()} style={{ marginTop: 16 }} data-testid="rooms-create-submit">
             {busy ? 'Creating…' : 'Create & enter'}
           </button>

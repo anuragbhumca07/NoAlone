@@ -1,14 +1,17 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, Min, Max, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateRoomDto {
   @ApiProperty()
   @IsString()
+  @MinLength(1)
+  @MaxLength(60)
   name: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(300)
   description?: string;
 
   @ApiProperty({ required: false, default: 'PUBLIC' })
@@ -19,6 +22,7 @@ export class CreateRoomDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   topic?: string;
 
   @ApiProperty({ required: false, default: 'en' })

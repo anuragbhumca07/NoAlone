@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsEnum, IsArray, IsObject, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsEnum, IsArray, IsObject, Min, Max, MinLength, MaxLength, ArrayMaxSize } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum GenderEnum {
@@ -11,15 +11,20 @@ export enum GenderEnum {
 export class CreateUserDto {
   @ApiProperty()
   @IsString()
+  @MinLength(3)
+  @MaxLength(24)
   username: string;
 
   @ApiProperty()
   @IsString()
+  @MinLength(1)
+  @MaxLength(50)
   displayName: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   bio?: string;
 
   @ApiProperty({ required: false })
@@ -42,7 +47,9 @@ export class CreateUserDto {
   @ApiProperty({ required: false, type: [String] })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
+  @MaxLength(30, { each: true })
   interests?: string[];
 
   @ApiProperty({ required: false, description: 'Customizable avatar config (skin tone, hair, outfit, etc)' })
