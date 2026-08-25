@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ReportUserDto {
@@ -13,5 +13,6 @@ export class ReportUserDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 }

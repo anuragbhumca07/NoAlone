@@ -66,6 +66,36 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try { await this.client!.del(key); } catch {}
   }
 
+  // Atomic increment-with-expiry for rate limiting: production runs multiple
+  // backend instances, so an in-memory counter per process would let each
+  // instance track its own separate budget instead of a shared one. Returns
+  // null when Redis is unreachable so the caller can fail open (same
+  // philosophy as the rest of this service — an outage shouldn't turn into
+  // "everyone gets rate-limited").
+  private static readonly INCR_WITH_EXPIRY_SCRIPT = `
+    local current = redis.call('INCR', KEYS[1])
+    if current == 1 then
+      redis.call('PEXPIRE', KEYS[1], ARGV[1])
+    end
+    local ttl = redis.call('PTTL', KEYS[1])
+    return {current, ttl}
+  `;
+
+  async incrWithExpiry(key: string, ttlMs: number): Promise<{ totalHits: number; ttlMs: number } | null> {
+    if (!this.isReady()) return null;
+    try {
+      const [totalHits, ttl] = (await this.client!.eval(
+        RedisService.INCR_WITH_EXPIRY_SCRIPT,
+        1,
+        key,
+        ttlMs,
+      )) as [number, number];
+      return { totalHits, ttlMs: ttl };
+    } catch {
+      return null;
+    }
+  }
+
   async setUserOnline(userId: string, socketId: string): Promise<void> {
     this.memOnlineUsers.add(userId);
     if (!this.isReady()) return;
