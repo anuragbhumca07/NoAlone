@@ -38,9 +38,14 @@ async function bootstrap() {
 
   // CORS — FRONTEND_URL may be a comma-separated list (e.g. localhost and
   // 127.0.0.1 are different origins to the browser even on the same machine).
+  // Falls back to known local-dev origins, never a bare '*': combined with
+  // credentials: true, a wildcard origin is a real CORS footgun (most CORS
+  // middleware reflects the request's actual Origin back in that case,
+  // since a literal '*' with credentials is invalid per spec) — harmless
+  // today only because nothing here uses cookies, but not worth relying on.
   const frontendUrls = process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
-    origin: frontendUrls?.length ? frontendUrls : '*',
+    origin: frontendUrls?.length ? frontendUrls : ['http://localhost:5173', 'http://127.0.0.1:5173'],
     credentials: true,
   });
 

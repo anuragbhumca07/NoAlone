@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { fromBuffer as fileTypeFromBuffer } from 'file-type';
 
 const BUCKET = 'chat-media';
 const MAX_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
@@ -26,6 +27,43 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100);
 }
 
+// The client-reported mimetype is just a form field — trivially spoofable
+// (e.g. an HTML/script payload declared as "image/png" to ride along on
+// whatever Content-Type the storage layer serves it back with). Cross-check
+// against the actual file bytes' magic-number signature before trusting it.
+//
+// file-type can't distinguish old-format .doc/.xls/.ppt from each other (all
+// share the same OLE2/CFB container) and returns nothing at all for plain
+// text — those get a coarser/no check rather than a false-positive reject.
+const OFFICE_CONTAINER_MIMES = new Set([
+  'application/x-cfb',
+  'application/zip',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/msword',
+  'application/vnd.ms-excel',
+]);
+const NO_RELIABLE_SIGNATURE = new Set(['text/plain', 'text/csv']);
+
+async function verifyActualFileType(declaredMime: string, buffer: Buffer): Promise<void> {
+  if (NO_RELIABLE_SIGNATURE.has(declaredMime)) return;
+
+  const detected = await fileTypeFromBuffer(buffer);
+  if (!detected) {
+    throw new BadRequestException('File content does not match a recognized format');
+  }
+
+  const sameCategory = ALLOWED_MIME_PREFIXES.some((p) => declaredMime.startsWith(p) && detected.mime.startsWith(p));
+  const bothOfficeLike = OFFICE_CONTAINER_MIMES.has(declaredMime) && OFFICE_CONTAINER_MIMES.has(detected.mime);
+  const exactMatch = declaredMime === detected.mime;
+
+  if (!sameCategory && !bothOfficeLike && !exactMatch) {
+    throw new BadRequestException(
+      `File content does not match declared type (declared ${declaredMime}, detected ${detected.mime})`,
+    );
+  }
+}
+
 @Injectable()
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
@@ -34,6 +72,7 @@ export class UploadsService {
     if (!file) throw new BadRequestException('No file provided');
     if (file.size > MAX_SIZE_BYTES) throw new BadRequestException('File is too large (max 15MB)');
     if (!isAllowedMime(file.mimetype)) throw new BadRequestException(`File type not allowed: ${file.mimetype}`);
+    await verifyActualFileType(file.mimetype, file.buffer);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
