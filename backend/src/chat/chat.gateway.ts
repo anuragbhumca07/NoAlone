@@ -136,9 +136,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('room:join')
-  handleRoomJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string }) {
+  async handleRoomJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string }) {
+    const allowed = await this.chatService.canAccessRoom(data.roomId, client.data.userId);
+    if (!allowed) return { success: false, error: 'Not a member of this room' };
     client.join(`room:${data.roomId}`);
     this.server.to(`room:${data.roomId}`).emit('room:user_joined', { userId: client.data.userId });
+    return { success: true };
   }
 
   @SubscribeMessage('room:leave')
@@ -149,8 +152,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('room:message')
   async handleRoomMessage(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const message = await this.chatService.saveRoomMessage(client.data.userId, data);
-    this.server.to(`room:${data.roomId}`).emit('room:message_new', message);
-    return { success: true };
+    try {
+      const message = await this.chatService.saveRoomMessage(client.data.userId, data);
+      this.server.to(`room:${data.roomId}`).emit('room:message_new', message);
+      return { success: true, message };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   }
 }

@@ -116,7 +116,36 @@ export class ChatService {
     return message;
   }
 
+  // PRIVATE rooms aren't listed anywhere (see RoomsService.findAll), so their
+  // id is the only thing standing between a non-member and the room's
+  // content — without this, any authenticated user who ever saw that id
+  // (a shared link, a log line, browser history) could read and post into
+  // it forever without ever actually joining. PUBLIC rooms stay open to
+  // read/post without membership, matching the "browsable" design.
+  async assertRoomAccess(roomId: string, userId: string): Promise<void> {
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.type === 'PRIVATE') {
+      const member = await this.prisma.roomMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+      if (!member) throw new ForbiddenException('Not a member of this room');
+    }
+  }
+
+  async canAccessRoom(roomId: string, userId: string): Promise<boolean> {
+    try {
+      await this.assertRoomAccess(roomId, userId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async saveRoomMessage(senderId: string, data: { roomId: string; content: string; type?: string }) {
+    await this.assertRoomAccess(data.roomId, senderId);
+    if (data.content && data.content.length > 10000) {
+      throw new BadRequestException('Message content exceeds 10,000 characters');
+    }
+
     return this.prisma.message.create({
       data: {
         roomId: data.roomId,

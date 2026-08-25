@@ -75,7 +75,30 @@ export class RoomsService {
     return { success: true };
   }
 
-  async getMessages(roomId: string, cursor?: string, limit: number = 50) {
+  // PRIVATE rooms aren't listed anywhere (see findAll below), so their id is
+  // the only thing standing between a non-member and the room's content —
+  // gate reading history on membership for those; PUBLIC rooms stay openly
+  // browsable/readable, matching their whole point.
+  async assertRoomAccess(roomId: string, userId: string): Promise<void> {
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.type === 'PRIVATE') {
+      const member = await this.prisma.roomMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+      if (!member) throw new ForbiddenException('Not a member of this room');
+    }
+  }
+
+  async canAccessRoom(roomId: string, userId: string): Promise<boolean> {
+    try {
+      await this.assertRoomAccess(roomId, userId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getMessages(roomId: string, userId: string, cursor?: string, limit: number = 50) {
+    await this.assertRoomAccess(roomId, userId);
     return this.prisma.message.findMany({
       where: {
         roomId,

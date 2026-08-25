@@ -8,6 +8,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
+import { RoomsService } from './rooms.service';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/rooms' })
 export class RoomsGateway {
@@ -16,13 +17,15 @@ export class RoomsGateway {
 
   private readonly logger = new Logger(RoomsGateway.name);
 
-  constructor(private jwtService: JwtService) {}
+  constructor(private jwtService: JwtService, private roomsService: RoomsService) {}
 
   @SubscribeMessage('voice:join')
-  handleVoiceJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string; signal: any }) {
+  async handleVoiceJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string; signal: any }) {
     const token = client.handshake.auth.token;
     try {
       const payload = this.jwtService.verify(token);
+      const allowed = await this.roomsService.canAccessRoom(data.roomId, payload.sub);
+      if (!allowed) return;
       client.join(`voice:${data.roomId}`);
       client.to(`voice:${data.roomId}`).emit('voice:user_joined', {
         userId: payload.sub,
