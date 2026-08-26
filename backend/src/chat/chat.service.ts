@@ -1,12 +1,23 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { SendMessageDto, CreateConversationDto } from './dto/send-message.dto';
 
 @Injectable()
 export class ChatService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private moderationService: ModerationService) {}
 
   async getOrCreateConversation(userId: string, dto: CreateConversationDto) {
+    // message:send already checks this before ever reaching here, so this
+    // is a no-op for that path — but POST /chat/conversations (used when
+    // starting a chat from search) never did, letting a blocked user create
+    // a conversation row with the person who blocked them. It couldn't
+    // actually send anything into it (message:send's own check stops that),
+    // but it would still show up as an empty "someone tried to reach you"
+    // entry in the blocker's chat list.
+    const blocked = await this.moderationService.isBlocked(userId, dto.targetUserId).catch(() => false);
+    if (blocked) throw new ForbiddenException('This user is unavailable.');
+
     const [user1Id, user2Id] = [userId, dto.targetUserId].sort();
 
     let conversation = await this.prisma.conversation.findUnique({
