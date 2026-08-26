@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-const ENCRYPTION_KEY = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY || 'noalone-default-key-32chars!!!!!!';
+const ENCRYPTION_KEY = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY!;
 const IV_LENGTH = 16;
 const EXPIRY_MINUTES = parseInt(process.env.MEET_LINK_EXPIRY_MINUTES || '55', 10);
 
@@ -92,7 +92,7 @@ export class MeetService {
   private async refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID || '',
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     });
@@ -185,7 +185,7 @@ export class MeetService {
     const params = new URLSearchParams({
       code,
       client_id: process.env.GOOGLE_CLIENT_ID || '',
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     });

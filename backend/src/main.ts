@@ -18,6 +18,21 @@ process.on('uncaughtException', (err) => {
 });
 
 async function bootstrap() {
+  // This repo is public. JWT signing, the Google OAuth client secret, and
+  // the key used to encrypt stored Google Calendar tokens at rest all used
+  // to silently fall back to a hardcoded value if the real env var was
+  // ever unset — meaning that fallback, and how to exploit it, was sitting
+  // in plain sight in the source for anyone to read. GOOGLE_TOKEN_ENCRYPTION_KEY
+  // was actually missing in production when this was found: every stored
+  // Google token was "encrypted" with a key visible in this repo, which is
+  // no real protection at all if the database is ever read some other way.
+  // Fail loudly at startup instead of silently running with a public secret.
+  for (const name of ['JWT_SECRET', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_TOKEN_ENCRYPTION_KEY']) {
+    if (!process.env[name]) {
+      throw new Error(`${name} environment variable is required and must not be empty.`);
+    }
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // Behind Railway's reverse proxy, req.ip would otherwise resolve to the
@@ -78,4 +93,12 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`noAlone backend running on port ${port}`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  // The unhandledRejection listener above is for transient runtime hiccups
+  // and deliberately keeps the process alive — wrong for a fatal startup
+  // config error, where the process would otherwise sit there "alive" but
+  // never actually listening, failing Railway's healthcheck with no clear
+  // reason why instead of exiting immediately with one.
+  console.error('Fatal error during startup:', err.message);
+  process.exit(1);
+});
