@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { MeetService } from './meet.service';
 import { InitiateCallDto } from './dto/call.dto';
 import { CallStatus, CallType } from '@prisma/client';
@@ -19,6 +20,7 @@ export class CallsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private moderationService: ModerationService,
     private meetService: MeetService,
   ) {}
 
@@ -58,6 +60,14 @@ export class CallsService {
     ]);
 
     if (!receiver) throw new NotFoundException('User not found');
+
+    // Chat already refuses to send messages between blocked users
+    // (chat.gateway.ts) — calls had no equivalent check at all, meaning a
+    // block did nothing to stop someone from still ringing the person who
+    // blocked them, arguably a more intrusive contact vector than a text
+    // message. Fail open on lookup errors, same as chat's block check.
+    const blocked = await this.moderationService.isBlocked(callerId, dto.receiverId).catch(() => false);
+    if (blocked) throw new ForbiddenException('This user is unavailable.');
 
     // Generate Meet link (requires Google Calendar auth)
     const meetResult = await this.meetService.createMeetLink(callerId);
