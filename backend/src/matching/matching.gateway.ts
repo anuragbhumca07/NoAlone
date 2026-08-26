@@ -25,11 +25,20 @@ export class MatchingGateway implements OnGatewayDisconnect {
 
   @SubscribeMessage('match:search')
   async handleSearch(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    // Without this, a second match:search on the same socket (a client bug,
+    // a doubled emit, anything short of an actual disconnect/reconnect)
+    // would spawn a second independent polling loop for the same user —
+    // each one able to find and emit its own match:found, potentially
+    // pairing the same person twice or just confusing the client with
+    // duplicate events.
+    if (client.data.searching) return;
+
     const token = client.handshake.auth.token;
     try {
       const payload = this.jwtService.verify(token);
       const userId = payload.sub;
       client.data.userId = userId;
+      client.data.searching = true;
 
       await this.matchingService.joinPool(userId, data);
 
@@ -51,6 +60,7 @@ export class MatchingGateway implements OnGatewayDisconnect {
           if (attempts >= maxAttempts) {
             client.emit('match:timeout', { message: 'No match found, try again' });
             await this.matchingService.leavePool(userId);
+            client.data.searching = false;
             return;
           }
 
@@ -59,6 +69,7 @@ export class MatchingGateway implements OnGatewayDisconnect {
             client.emit('match:found', result);
             // Also notify the matched user
             this.server.emit(`match:found:${result.user.id}`, result);
+            client.data.searching = false;
           } else {
             attempts++;
             setTimeout(poll, 2000);
@@ -66,12 +77,14 @@ export class MatchingGateway implements OnGatewayDisconnect {
         } catch (e) {
           this.logger.warn(`match poll failed for ${userId}: ${e.message}`);
           client.emit('match:error', { message: 'Matching failed, please try again' });
+          client.data.searching = false;
         }
       };
 
       setTimeout(poll, 1000);
 
     } catch (e) {
+      client.data.searching = false;
       client.emit('match:error', { message: 'Authentication failed' });
     }
   }
@@ -82,6 +95,7 @@ export class MatchingGateway implements OnGatewayDisconnect {
     try {
       const payload = this.jwtService.verify(token);
       await this.matchingService.leavePool(payload.sub);
+      client.data.searching = false;
       client.emit('match:cancelled', {});
     } catch (e) {}
   }
