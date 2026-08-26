@@ -36,10 +36,19 @@ export class RoomsGateway {
 
   @SubscribeMessage('voice:signal')
   handleVoiceSignal(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string; targetUserId: string; signal: any }) {
-    this.server.to(`user:${data.targetUserId}`).emit('voice:signal', {
-      fromUserId: client.data.userId,
-      signal: data.signal,
-    });
+    // Unlike voice:join/voice:leave, this had no auth check at all — anyone
+    // could hit it without ever sending a valid token. No client currently
+    // uses this event (voice rooms were never wired up past this
+    // scaffolding), so it's not live-exploitable today, but there's no
+    // reason for it to be the one handler in this file with no verification.
+    const token = client.handshake.auth.token;
+    try {
+      const payload = this.jwtService.verify(token);
+      this.server.to(`user:${data.targetUserId}`).emit('voice:signal', {
+        fromUserId: payload.sub,
+        signal: data.signal,
+      });
+    } catch (e) {}
   }
 
   @SubscribeMessage('voice:leave')

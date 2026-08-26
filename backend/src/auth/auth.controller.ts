@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get, UseGuards, Req, Res, Patch, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsString } from 'class-validator';
+import { IsString, MaxLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { SendOtpDto, VerifyOtpDto } from './dto/login.dto';
 import { EmailRegisterDto, EmailVerifyDto, EmailLoginDto, GoogleMobileDto, SupabaseSyncDto } from './dto/email-auth.dto';
@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 class UpdateFcmDto {
   @IsString()
+  @MaxLength(4096)
   fcmToken: string;
 }
 
