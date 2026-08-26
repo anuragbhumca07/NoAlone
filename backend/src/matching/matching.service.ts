@@ -12,10 +12,36 @@ export class MatchingService {
     private notifications: NotificationsService,
   ) {}
 
+  private static readonly GENDER_PREFS = new Set(['ANY', 'MALE', 'FEMALE', 'OTHER']);
+
+  // The REST endpoint (POST /matching/join, used by mobile) validates this
+  // shape via JoinPoolDto. The socket path (match:search, used by web)
+  // passes an untyped payload straight through — sanitize it here instead,
+  // in the one place both paths actually go through, rather than relying
+  // on the socket handler to have its own copy of the same rules.
+  private sanitizePreferences(preferences: {
+    language?: string;
+    ageGroup?: string;
+    interests?: string[];
+    genderPreference?: string;
+  }) {
+    const genderPreference =
+      typeof preferences.genderPreference === 'string' && MatchingService.GENDER_PREFS.has(preferences.genderPreference)
+        ? preferences.genderPreference
+        : undefined;
+    const interests = Array.isArray(preferences.interests)
+      ? preferences.interests.filter((i) => typeof i === 'string').slice(0, 20).map((i) => i.slice(0, 30))
+      : undefined;
+    const language = typeof preferences.language === 'string' ? preferences.language.slice(0, 20) : undefined;
+    const ageGroup = typeof preferences.ageGroup === 'string' ? preferences.ageGroup.slice(0, 20) : undefined;
+    return { language, ageGroup, interests, genderPreference };
+  }
+
   async joinPool(
     userId: string,
-    preferences: { language?: string; ageGroup?: string; interests?: string[]; genderPreference?: string },
+    rawPreferences: { language?: string; ageGroup?: string; interests?: string[]; genderPreference?: string },
   ) {
+    const preferences = this.sanitizePreferences(rawPreferences || {});
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, language: true, age: true, interests: true, displayName: true, avatarUrl: true, gender: true },
