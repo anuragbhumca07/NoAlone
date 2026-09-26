@@ -1,3 +1,5 @@
+import { auth } from './store';
+
 const API_URL =
   import.meta.env.VITE_API_URL || 'https://noalone-api-production.up.railway.app/api/v1';
 
@@ -29,6 +31,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
 
   if (!res.ok) {
+    if (res.status === 401) auth.clear();
     const message =
       (body && (body.message || body.error)) || `Request failed (${res.status})`;
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message, body);
@@ -50,6 +53,7 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
 
   if (!res.ok) {
+    if (res.status === 401) auth.clear();
     const message = (body && (body.message || body.error)) || `Upload failed (${res.status})`;
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message, body);
   }
