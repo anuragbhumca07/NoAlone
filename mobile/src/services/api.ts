@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { router } from 'expo-router';
 import { API_URL } from '../constants';
 import * as SecureStore from 'expo-secure-store';
+import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({ baseURL: API_URL });
 
@@ -14,7 +16,8 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('auth_token');
+      await useAuthStore.getState().logout();
+      router.replace('/(auth)/welcome');
     }
     return Promise.reject(error);
   },
