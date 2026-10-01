@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/.env
+**/*.log
+.git
+mobile
+web/node_modules
+web/dist
+test-results
