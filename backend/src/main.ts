@@ -76,6 +76,11 @@ async function bootstrap() {
   // WebSocket adapter
   app.useWebSocketAdapter(new IoAdapter(app));
 
+  // Redirect root to Swagger docs so visiting the base URL isn't a blank 404.
+  app.getHttpAdapter().getInstance().get('/', (_req: any, res: any) => {
+    res.redirect('/api/docs');
+  });
+
   // API prefix
   app.setGlobalPrefix('api/v1');
 
