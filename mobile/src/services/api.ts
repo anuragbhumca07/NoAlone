@@ -94,3 +94,13 @@ export const moderationAPI = {
   unblockUser: (userId: string) => api.delete(`/moderation/block/${userId}`),
   getBlocked: () => api.get('/moderation/blocked'),
 };
+
+// AI Companion
+export const aiCompanionAPI = {
+  getCompanion: () => api.get('/ai-companion/me'),
+  updateCompanion: (data: { name?: string; gender?: string; outfit?: object }) =>
+    api.put('/ai-companion/me', data),
+  getMessages: () => api.get('/ai-companion/messages'),
+  sendMessage: (content: string) => api.post('/ai-companion/messages', { content }),
+  clearMessages: () => api.delete('/ai-companion/messages'),
+};

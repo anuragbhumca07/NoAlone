@@ -22,9 +22,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Discover',
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
-          headerTitle: 'noAlone',
+          title: 'AI Buddy',
+          tabBarIcon: ({ color, size }) => <Ionicons name="happy" size={size} color={color} />,
+          headerTitle: 'AI Buddy',
         }}
       />
       <Tabs.Screen

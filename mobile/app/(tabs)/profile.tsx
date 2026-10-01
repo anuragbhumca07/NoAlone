@@ -18,7 +18,7 @@ export default function ProfileScreen() {
   });
 
   const menuItems = [
-    { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+    { icon: 'person-outline', label: 'Edit Profile', onPress: () => router.push('/profile/edit') },
     { icon: 'shield-outline', label: 'Privacy & Safety', onPress: () => {} },
     { icon: 'ban-outline', label: 'Blocked Users', onPress: () => {} },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => {} },
