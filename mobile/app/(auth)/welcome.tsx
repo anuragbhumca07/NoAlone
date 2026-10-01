@@ -25,8 +25,12 @@ export default function WelcomeScreen() {
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: 'noalone' });
 
+  // androidClientId must be defined on Android to avoid a runtime throw.
+  // We use the web client ID as fallback so the hook initialises safely;
+  // the actual Google OAuth flow will redirect through the web client.
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ['openid', 'profile', 'email'],
     redirectUri,
   });
