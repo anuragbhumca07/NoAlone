@@ -85,7 +85,6 @@ function RootLayoutInner() {
         <Stack.Screen name="chat/[id]" options={{ title: '' }} />
         <Stack.Screen name="room/[id]" options={{ title: '' }} />
         <Stack.Screen name="profile/[id]" options={{ title: 'Profile' }} />
-        <Stack.Screen name="matching" options={{ title: '', headerTransparent: true }} />
         <Stack.Screen name="call/authorize" options={{ title: 'Authorize Calls', presentation: 'modal' }} />
         <Stack.Screen name="profile/edit" options={{ title: 'Edit Profile' }} />
         <Stack.Screen name="call/outgoing" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
