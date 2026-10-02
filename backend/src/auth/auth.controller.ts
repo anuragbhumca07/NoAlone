@@ -94,6 +94,14 @@ export class AuthController {
     return this.authService.devGetVerificationCode(body.email);
   }
 
+  @Post('test/phone-otp')
+  @ApiOperation({ summary: 'Get stored phone OTP from Redis (test-only)' })
+  async testGetPhoneOtp(@Body() body: { phone: string; testKey: string }) {
+    const testKey = process.env.TEST_API_KEY;
+    if (!testKey || body.testKey !== testKey) throw new ForbiddenException();
+    return this.authService.devGetPhoneOtp(body.phone);
+  }
+
   @Post('test/supabase-seed-user')
   @ApiOperation({ summary: 'Create + confirm a Supabase test user, return an access token (test-only)' })
   async testSeedSupabaseUser(@Body() body: { email: string; password: string; testKey: string }) {

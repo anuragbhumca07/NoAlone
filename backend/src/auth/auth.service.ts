@@ -3,9 +3,11 @@ import {
   BadRequestException,
   UnauthorizedException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import Twilio from 'twilio';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from './email.service';
@@ -15,6 +17,13 @@ import { EmailRegisterDto, EmailVerifyDto, EmailLoginDto } from './dto/email-aut
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  private twilioClient = (
+    process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+      ? Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+      : null
+  );
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -47,8 +56,23 @@ export class AuthService {
       data: { phone: dto.phone, code: otp, expiresAt },
     });
 
-    // TODO: send via Twilio in production
-    console.log(`OTP for ${dto.phone}: ${otp}`);
+    this.logger.log(`[PHONE OTP] phone=${dto.phone} code=${otp}`);
+
+    if (this.twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+      try {
+        await this.twilioClient.messages.create({
+          body: `Your noAlone verification code is: ${otp}. It expires in 10 minutes.`,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: dto.phone,
+        });
+        this.logger.log(`SMS sent to ${dto.phone}`);
+      } catch (err: any) {
+        this.logger.error(`Twilio failed for ${dto.phone}: ${err?.message}`);
+      }
+    } else {
+      this.logger.warn('Twilio not configured — OTP only in logs');
+    }
+
     return { message: 'OTP sent successfully' };
   }
 
@@ -213,6 +237,11 @@ export class AuthService {
       select: { emailVerificationCode: true },
     });
     return { code: user?.emailVerificationCode ?? null };
+  }
+
+  async devGetPhoneOtp(phone: string): Promise<{ code: string | null }> {
+    const code = await this.redis.get(`otp:${phone}`);
+    return { code: code ?? null };
   }
 
   /**
