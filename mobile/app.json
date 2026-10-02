@@ -50,7 +50,7 @@
       ],
       "expo-font"
     ],
-    "scheme": "noalone",
+    "scheme": ["noalone", "com.googleusercontent.apps.513754739235-q1cou8v8uqqdbq19uu4ad2lfh389lhj2"],
     "newArchEnabled": false,
     "extra": {
       "eas": {
