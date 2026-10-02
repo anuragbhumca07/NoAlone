@@ -6,8 +6,18 @@ import { Resend } from 'resend';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  // Primary: SMTP (e.g. Gmail App Password — works for any recipient immediately)
-  private smtpTransport = (process.env.SMTP_USER && process.env.SMTP_PASS)
+  // SMTP — try port 465 (SSL) first, then 587 (STARTTLS) as fallback
+  // Railway blocks 587 outbound; 465 is typically open
+  private smtpTransport465 = (process.env.SMTP_USER && process.env.SMTP_PASS)
+    ? nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      })
+    : null;
+
+  private smtpTransport587 = (process.env.SMTP_USER && process.env.SMTP_PASS)
     ? nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: Number(process.env.SMTP_PORT) || 587,
@@ -16,8 +26,9 @@ export class EmailService {
       })
     : null;
 
-  // Fallback: Resend (only delivers to Resend account owner without custom domain)
-  private resend = (!this.smtpTransport && process.env.RESEND_API_KEY)
+  // Resend — always available as final fallback (onboarding@resend.dev only delivers
+  // to the Resend account owner's email without a custom domain)
+  private resend = process.env.RESEND_API_KEY
     ? new Resend(process.env.RESEND_API_KEY)
     : null;
 
@@ -25,19 +36,30 @@ export class EmailService {
     this.logger.log(`[VERIFICATION CODE] email=${email} code=${code}`);
 
     const html = this.buildEmailHtml(code);
+    const mailOptions = {
+      from: `"noAlone" <${process.env.SMTP_USER || 'noreply@noalone.app'}>`,
+      to: email,
+      subject: 'Your noAlone verification code',
+      html,
+    };
 
-    if (this.smtpTransport) {
+    if (this.smtpTransport465) {
       try {
-        await this.smtpTransport.sendMail({
-          from: `"noAlone" <${process.env.SMTP_USER}>`,
-          to: email,
-          subject: 'Your noAlone verification code',
-          html,
-        });
-        this.logger.log(`Verification email sent via SMTP to ${email}`);
+        await this.smtpTransport465.sendMail(mailOptions);
+        this.logger.log(`Verification email sent via SMTP/465 to ${email}`);
         return;
       } catch (err: any) {
-        this.logger.error(`SMTP failed for ${email}: ${err?.message}`);
+        this.logger.error(`SMTP/465 failed for ${email}: ${err?.message}`);
+      }
+    }
+
+    if (this.smtpTransport587) {
+      try {
+        await this.smtpTransport587.sendMail(mailOptions);
+        this.logger.log(`Verification email sent via SMTP/587 to ${email}`);
+        return;
+      } catch (err: any) {
+        this.logger.error(`SMTP/587 failed for ${email}: ${err?.message}`);
       }
     }
 
@@ -60,7 +82,7 @@ export class EmailService {
       }
     }
 
-    this.logger.warn('No email transport configured (SMTP_USER/SMTP_PASS or RESEND_API_KEY required)');
+    this.logger.warn('No email transport succeeded — code is in logs above');
   }
 
   private buildEmailHtml(code: string): string {
