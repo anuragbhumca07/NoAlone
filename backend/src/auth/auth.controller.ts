@@ -17,7 +17,6 @@ class UpdateFcmDto {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  private readonly buildTag = 'v20261002-otp-fix';
   constructor(private authService: AuthService) {}
 
   // ─── Phone OTP ───────────────────────────────────────────────────────────────
