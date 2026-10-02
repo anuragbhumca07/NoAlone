@@ -18,6 +18,11 @@ WebBrowser.maybeCompleteAuthSession();
 const GOOGLE_WEB_CLIENT_ID =
   '513754739235-fb3scfuq6m8o4cd4ssjg2ta40d609ho1.apps.googleusercontent.com';
 
+// Create this in Google Cloud Console → Credentials → + CREATE → OAuth client ID → Android
+// Package name: com.noalone.app  |  SHA-1: from `eas credentials --platform android`
+const GOOGLE_ANDROID_CLIENT_ID =
+  '513754739235-q1cou8v8uqqdbq19uu4ad2lfh389lhj2.apps.googleusercontent.com';
+
 export default function WelcomeScreen() {
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
@@ -25,12 +30,9 @@ export default function WelcomeScreen() {
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: 'noalone' });
 
-  // androidClientId must be defined on Android to avoid a runtime throw.
-  // We use the web client ID as fallback so the hook initialises safely;
-  // the actual Google OAuth flow will redirect through the web client.
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     scopes: ['openid', 'profile', 'email'],
     redirectUri,
   });
